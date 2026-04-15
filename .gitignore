@@ -1,0 +1,12 @@
+node_modules
+package-lock.json
+app/.next
+app/out
+worker/dist
+.env
+.env.local
+.env.*.local
+coverage
+.DS_Store
+*.log
+prisma/generated

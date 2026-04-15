@@ -1,0 +1,38 @@
+{
+  "name": "gallery-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1030.0",
+    "@prisma/adapter-pg": "7.7.0",
+    "@prisma/client": "7.7.0",
+    "bullmq": "5.73.5",
+    "date-fns": "4.1.0",
+    "ioredis": "5.10.1",
+    "jose": "6.2.2",
+    "lucide-react": "1.8.0",
+    "pg": "8.20.0",
+    "sharp": "0.34.5",
+    "zod": "4.3.6",
+    "next": "16.2.3",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8.15.6",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.3",
+    "tailwindcss": "^4",
+    "typescript": "^5.9.3"
+  }
+}

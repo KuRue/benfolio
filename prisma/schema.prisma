@@ -1,0 +1,347 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum EventVisibility {
+  DRAFT
+  HIDDEN
+  PUBLIC
+}
+
+enum PhotoProcessingState {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum PhotoDerivativeKind {
+  THUMBNAIL
+  GRID
+  VIEWER
+  OG
+}
+
+enum ImageFormat {
+  JPEG
+  WEBP
+  AVIF
+  PNG
+}
+
+enum ExternalAssetSource {
+  MANUAL
+  STORAGE_IMPORT
+  FURTRACK
+}
+
+enum ImportJobType {
+  MANUAL_UPLOAD
+  STORAGE_IMPORT
+  FURTRACK_SYNC
+}
+
+enum ImportJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum ImportItemStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  FAILED
+  SKIPPED
+}
+
+enum ImportCleanupStatus {
+  NOT_REQUIRED
+  PENDING
+  DELETED
+  ARCHIVED
+  FAILED
+}
+
+enum PhotoOrderMode {
+  AUTO
+  MANUAL
+}
+
+enum DuplicateReviewScope {
+  GLOBAL
+  EVENT
+}
+
+enum DuplicateReviewDecision {
+  KEEP_BOTH
+  DISMISSED
+}
+
+enum TagCategory {
+  CHARACTER
+  EVENT
+  SPECIES
+  MAKER
+  GENERAL
+}
+
+model SiteProfile {
+  id                String   @id @default("default")
+  displayName       String   @default("Your Studio")
+  handle            String?
+  headline          String   @default("Event photography arranged with the feel of the original night.")
+  bio               String   @default("A mobile-first archive for event coverage, client galleries, and private releases.")
+  location          String?
+  contactEmail      String?
+  websiteUrl        String?
+  instagramUrl      String?
+  avatarOriginalKey String?
+  avatarDisplayKey  String?
+  coverOriginalKey  String?
+  coverDisplayKey   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Event {
+  id              String          @id @default(cuid())
+  title           String
+  slug            String          @unique
+  eventDate       DateTime
+  location        String?
+  description     String?
+  visibility      EventVisibility @default(DRAFT)
+  photoOrderMode  PhotoOrderMode  @default(AUTO)
+  coverOriginalKey String?
+  coverDisplayKey  String?
+  coverWidth      Int?
+  coverHeight     Int?
+  publishedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  photos          Photo[]
+  importJobs      ImportJob[]
+  importItems     ImportItem[]
+  externalLinks   ExternalAssetLink[]
+  duplicateReviews DuplicateReview[]
+
+  @@index([eventDate])
+  @@index([visibility, eventDate])
+}
+
+model Photo {
+  id                 String               @id @db.VarChar(12)
+  eventId            String
+  originalKey        String
+  originalFilename   String
+  originalMimeType   String
+  originalByteSize   BigInt
+  contentHashSha256  String?              @db.VarChar(64)
+  sortOrder          Int                  @default(0)
+  processingState    PhotoProcessingState @default(UPLOADED)
+  title              String?
+  altText            String?
+  caption            String?
+  width              Int?
+  height             Int?
+  orientation        Int?
+  dominantColor      String?
+  blurDataUrl        String?
+  capturedAt         DateTime?
+  takenAtOverride    DateTime?
+  cameraMake         String?
+  cameraModel        String?
+  lensModel          String?
+  focalLength        String?
+  aperture           String?
+  shutterSpeed       String?
+  iso                Int?
+  exifJson           Json?
+  errorMessage       String?
+  processedAt        DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  event              Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  derivatives        PhotoDerivative[]
+  tags               PhotoTag[]
+  externalLinks      ExternalAssetLink[]
+  importItems        ImportItem[]
+
+  @@index([eventId, sortOrder])
+  @@index([eventId, capturedAt])
+  @@index([processingState])
+  @@index([contentHashSha256])
+}
+
+model PhotoDerivative {
+  id          String             @id @default(cuid())
+  photoId     String
+  kind        PhotoDerivativeKind
+  format      ImageFormat
+  width       Int
+  height      Int
+  byteSize    Int?
+  contentType String
+  storageKey  String
+  createdAt   DateTime           @default(now())
+  photo       Photo              @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([photoId, kind, format, width])
+  @@index([photoId, kind])
+}
+
+model Tag {
+  id        String      @id @default(cuid())
+  category  TagCategory @default(GENERAL)
+  slug      String
+  name      String
+  createdAt DateTime    @default(now())
+  photos    PhotoTag[]
+
+  @@unique([category, slug])
+  @@index([category, name])
+  @@index([slug])
+}
+
+model PhotoTag {
+  photoId    String
+  tagId      String
+  createdAt  DateTime @default(now())
+  photo      Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([photoId, tagId])
+}
+
+model ExternalAssetLink {
+  id           String              @id @default(cuid())
+  source       ExternalAssetSource
+  assetType    String
+  externalId   String
+  externalUrl  String?
+  metadataJson Json?
+  eventId      String?
+  photoId      String?
+  createdAt    DateTime            @default(now())
+  event        Event?              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photo        Photo?              @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([source, externalId, assetType])
+  @@index([eventId])
+  @@index([photoId])
+}
+
+model ImportJob {
+  id              String          @id @default(cuid())
+  type            ImportJobType
+  source          ExternalAssetSource @default(MANUAL)
+  status          ImportJobStatus @default(PENDING)
+  eventId         String?
+  requestedById   String?
+  payloadJson     Json?
+  totalItems      Int             @default(0)
+  processedItems  Int             @default(0)
+  errorMessage    String?
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  event           Event?          @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  requestedBy     AdminUser?      @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  items           ImportItem[]
+
+  @@index([status, createdAt])
+  @@index([eventId])
+}
+
+model ImportItem {
+  id               String              @id @default(cuid())
+  importJobId      String
+  source           ExternalAssetSource @default(STORAGE_IMPORT)
+  sourceKey        String
+  sourceFilename   String
+  sourceByteSize   BigInt?
+  sourceLastModified DateTime?
+  sourceProvider   String?
+  sourceEtag       String?
+  sourceVersion    String?
+  contentHashSha256 String?             @db.VarChar(64)
+  eventSlug        String
+  eventId          String?
+  photoId          String?
+  status           ImportItemStatus    @default(PENDING)
+  cleanupMode      String?
+  cleanupStatus    ImportCleanupStatus @default(PENDING)
+  cleanupTargetKey String?
+  cleanupError     String?
+  skipReason       String?
+  errorMessage     String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  dismissedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  importJob        ImportJob           @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  event            Event?              @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  photo            Photo?              @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  events           ImportItemEvent[]
+
+  @@unique([importJobId, sourceKey])
+  @@index([status, createdAt])
+  @@index([source, sourceKey])
+  @@index([eventSlug])
+  @@index([eventId])
+  @@index([photoId])
+  @@index([dismissedAt])
+  @@index([contentHashSha256])
+}
+
+model ImportItemEvent {
+  id          String     @id @default(cuid())
+  importItemId String
+  eventType   String
+  label       String
+  detail      String?
+  metadataJson Json?
+  createdAt   DateTime   @default(now())
+  importItem  ImportItem @relation(fields: [importItemId], references: [id], onDelete: Cascade)
+
+  @@index([importItemId, createdAt])
+  @@index([eventType, createdAt])
+}
+
+model DuplicateReview {
+  id                          String                  @id @default(cuid())
+  scope                       DuplicateReviewScope
+  scopeKey                    String
+  contentHashSha256           String                  @db.VarChar(64)
+  decision                    DuplicateReviewDecision
+  eventId                     String?
+  photoCountSnapshot          Int
+  latestPhotoCreatedAtSnapshot DateTime
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  event                       Event?                  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([scopeKey, contentHashSha256])
+  @@index([contentHashSha256])
+  @@index([eventId])
+}
+
+model AdminUser {
+  id           String      @id @default(cuid())
+  displayName  String
+  email        String      @unique
+  passwordHash String
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  importJobs   ImportJob[]
+}

@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "noEmit": false,
+    "types": ["node"],
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src/**/*.ts", "../prisma/generated/client/**/*.ts"]
+}

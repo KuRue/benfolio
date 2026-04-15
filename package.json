@@ -1,0 +1,32 @@
+{
+  "name": "benfolio-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "app",
+    "worker"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace app",
+    "dev:app": "npm run dev --workspace app",
+    "dev:worker": "npm run dev --workspace worker",
+    "build": "npm run build --workspace app && npm run build --workspace worker",
+    "lint": "npm run lint --workspace app && npm run lint --workspace worker",
+    "db:generate": "prisma generate --config ./prisma.config.ts",
+    "db:migrate": "prisma migrate dev --config ./prisma.config.ts",
+    "db:deploy": "prisma migrate deploy --config ./prisma.config.ts",
+    "db:seed": "prisma db seed --config ./prisma.config.ts",
+    "db:studio": "prisma studio --config ./prisma.config.ts",
+    "postinstall": "npm run db:generate"
+  },
+  "devDependencies": {
+    "@prisma/adapter-pg": "7.7.0",
+    "@types/node": "^24.7.2",
+    "dotenv": "^17.2.3",
+    "pg": "8.20.0",
+    "prisma": "7.7.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

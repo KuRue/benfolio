@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "ExternalAssetSource" ADD VALUE IF NOT EXISTS 'STORAGE_IMPORT';
+
+-- AlterEnum
+ALTER TYPE "ImportJobType" ADD VALUE IF NOT EXISTS 'STORAGE_IMPORT';

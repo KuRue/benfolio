@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+:root {
+  --background: #050505;
+  --foreground: #f3f0eb;
+  --line: rgba(255, 255, 255, 0.1);
+  --accent: #c5965c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-serif: var(--font-display);
+}
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  background:
+    radial-gradient(circle at top, rgba(197, 150, 92, 0.18), transparent 22%),
+    linear-gradient(180deg, #070707 0%, #050505 48%, #030303 100%);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), sans-serif;
+}
+
+.glass-panel {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0.06)
+  );
+  backdrop-filter: blur(18px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 60px rgba(0, 0, 0, 0.28);
+}
+
+.glass-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.6rem 0.9rem;
+  backdrop-filter: blur(18px);
+}
+
+.viewer-control {
+  display: inline-flex;
+  height: 2.65rem;
+  width: 2.65rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.viewer-control:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.viewer-control:disabled {
+  opacity: 0.35;
+}
+
+.section-shell {
+  margin-inline: auto;
+  width: min(100% - 2rem, 80rem);
+}
+
+.editorial-label {
+  text-transform: uppercase;
+  letter-spacing: 0.35em;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.68rem;
+}
+
+.admin-input,
+.admin-textarea,
+.admin-select {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.95rem 1rem;
+  color: white;
+  outline: none;
+}
+
+.admin-input:focus,
+.admin-textarea:focus,
+.admin-select:focus {
+  border-color: rgba(197, 150, 92, 0.7);
+  box-shadow: 0 0 0 1px rgba(197, 150, 92, 0.6);
+}
+
+.admin-textarea {
+  min-height: 9rem;
+  resize: vertical;
+}
+
+.admin-card {
+  border-radius: 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)),
+    rgba(0, 0, 0, 0.28);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+}

@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gallery}
+      POSTGRES_USER: ${POSTGRES_USER:-gallery}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gallery} -d ${POSTGRES_DB:-gallery}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    image: ghcr.io/kurue/benfolio-web:${BENFOLIO_IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      DATABASE_URL: ${SERVER_DATABASE_URL:-postgresql://gallery:change-me@db:5432/gallery?schema=public}
+      REDIS_URL: ${SERVER_REDIS_URL:-redis://redis:6379}
+
+  worker:
+    image: ghcr.io/kurue/benfolio-worker:${BENFOLIO_IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${SERVER_DATABASE_URL:-postgresql://gallery:change-me@db:5432/gallery?schema=public}
+      REDIS_URL: ${SERVER_REDIS_URL:-redis://redis:6379}
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+app/node_modules
+worker/node_modules
+app/.next
+worker/dist
+.env
+.env.*
+!.env.example
+npm-debug.log*
+coverage
+.DS_Store
