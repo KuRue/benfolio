@@ -144,7 +144,7 @@ export function PhotoViewerClient({
     <div
       className={
         isModal
-          ? "fixed inset-0 z-50 flex bg-black/85 backdrop-blur-2xl"
+          ? "fixed inset-0 z-50 flex bg-black/88 backdrop-blur-2xl"
           : "min-h-screen bg-[#050505]"
       }
       onTouchStart={(event) => {
@@ -172,8 +172,8 @@ export function PhotoViewerClient({
       }}
     >
       <div className="flex min-h-screen w-full flex-col">
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-4 sm:p-6">
-          <div className="glass-panel pointer-events-auto flex items-center gap-2 rounded-full px-2 py-2">
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-3 sm:p-5">
+          <div className="glass-panel pointer-events-auto flex items-center gap-1.5 rounded-full px-1.5 py-1.5 sm:gap-2 sm:px-2 sm:py-2">
             <button
               type="button"
               onClick={handleClose}
@@ -202,7 +202,7 @@ export function PhotoViewerClient({
             </button>
           </div>
 
-          <div className="glass-panel pointer-events-auto flex items-center gap-2 rounded-full px-2 py-2">
+          <div className="glass-panel pointer-events-auto flex items-center gap-1.5 rounded-full px-1.5 py-1.5 sm:gap-2 sm:px-2 sm:py-2">
             <PublicPhotoSearchLauncher triggerClassName="viewer-control" />
             <button
               type="button"
@@ -226,42 +226,45 @@ export function PhotoViewerClient({
           </div>
         </div>
 
-        <div className="grid min-h-screen flex-1 items-stretch lg:grid-cols-[1fr,24rem]">
-          <div className="flex min-h-screen items-center justify-center px-3 pb-28 pt-24 sm:px-6 lg:px-10">
+        <div className="grid min-h-screen flex-1 items-stretch lg:grid-cols-[minmax(0,1fr),25rem] xl:grid-cols-[minmax(0,1fr),27rem]">
+          <div className="relative flex min-h-screen items-center justify-center px-3 pb-[6.5rem] pt-[5.5rem] sm:px-5 sm:pb-28 sm:pt-24 lg:px-10">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(255,255,255,0.04),_transparent_42%),radial-gradient(circle_at_center,_rgba(197,150,92,0.08),_transparent_70%)]" />
             {imageUrl ? (
-              <img
-                src={imageUrl}
-                width={imageWidth}
-                height={imageHeight}
-                alt={alt}
-                className="max-h-[78vh] w-auto max-w-full rounded-[1.6rem] object-contain shadow-[0_36px_120px_rgba(0,0,0,0.45)]"
-              />
+              <div className="relative flex max-h-[79vh] max-w-full items-center justify-center rounded-[1.7rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-2 shadow-[0_36px_120px_rgba(0,0,0,0.42)] sm:p-3">
+                <img
+                  src={imageUrl}
+                  width={imageWidth}
+                  height={imageHeight}
+                  alt={alt}
+                  className="max-h-[74vh] w-auto max-w-full rounded-[1.2rem] object-contain shadow-[0_20px_80px_rgba(0,0,0,0.34)] sm:max-h-[78vh]"
+                />
+              </div>
             ) : (
-              <div className="rounded-[1.6rem] border border-white/10 bg-white/5 px-8 py-10 text-sm text-white/55">
+              <div className="muted-panel px-8 py-10 text-sm text-white/55">
                 This photograph is still being processed.
               </div>
             )}
           </div>
 
           <aside
-            className={`fixed inset-y-0 right-0 z-20 w-[20rem] max-w-[92vw] border-l border-white/10 bg-black/80 px-5 py-24 backdrop-blur-2xl transition-transform duration-300 lg:static lg:w-auto lg:translate-x-0 lg:border-l lg:bg-white/5 lg:px-6 lg:py-28 ${
+            className={`fixed inset-y-0 right-0 z-20 w-[21rem] max-w-[92vw] border-l border-white/10 bg-[#060606]/90 px-4 py-[5.5rem] backdrop-blur-2xl transition-transform duration-300 sm:px-5 sm:py-24 lg:static lg:w-auto lg:translate-x-0 lg:bg-transparent lg:px-6 lg:py-[6.5rem] ${
               infoOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
             }`}
           >
-            <div className="space-y-6">
+            <div className="muted-panel space-y-6 px-4 py-5 sm:px-5 sm:py-6 lg:sticky lg:top-6">
               <div className="space-y-3">
                 <a
                   href={eventHref}
-                  className="text-[0.68rem] uppercase tracking-[0.34em] text-white/46"
+                  className="text-[0.68rem] uppercase tracking-[0.34em] text-white/42 transition hover:text-white/72"
                 >
                   Return to event
                 </a>
-                <h1 className="font-serif text-3xl leading-none tracking-[-0.03em] text-white">
+                <h1 className="font-serif text-[2rem] leading-none tracking-[-0.04em] text-white sm:text-[2.2rem]">
                   {title}
                 </h1>
-                <p className="text-sm leading-7 text-white/60">{subtitle}</p>
+                <p className="text-sm leading-7 text-white/58">{subtitle}</p>
                 {shareState !== "idle" ? (
-                  <p className="text-xs uppercase tracking-[0.28em] text-[#c5965c]">
+                  <p className="text-[0.68rem] uppercase tracking-[0.28em] text-[#c5965c]">
                     {shareState === "copied" ? "Link copied" : "Share sheet opened"}
                   </p>
                 ) : null}
@@ -285,11 +288,14 @@ export function PhotoViewerClient({
                   </p>
                   <div className="space-y-3">
                     {tagGroups.map((group) => (
-                      <div key={group.category} className="space-y-2">
+                      <div
+                        key={group.category}
+                        className="rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-3 py-3"
+                      >
                         <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/34">
                           {group.label}
                         </p>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="mt-2 flex flex-wrap gap-2">
                           {group.tags.map((tag) => (
                             <span
                               key={`${group.category}:${tag.slug ?? tag.name}`}

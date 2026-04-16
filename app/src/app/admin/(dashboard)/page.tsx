@@ -14,19 +14,25 @@ export default async function AdminOverviewPage() {
   ];
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-2">
+    <div className="space-y-8 sm:space-y-9">
+      <section className="space-y-2.5">
         <p className="editorial-label">Overview</p>
-        <h1 className="font-serif text-4xl tracking-[-0.03em] text-white">
+        <h1 className="font-serif text-4xl tracking-[-0.04em] text-white sm:text-[2.8rem]">
           Local gallery control room.
         </h1>
+        <p className="max-w-3xl text-sm leading-7 text-white/54 sm:text-[0.95rem]">
+          Monitor publishing state, triage imports, and move between editorial tasks
+          without losing the image-first feel of the product.
+        </p>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {cards.map((card) => (
           <div key={card.label} className="admin-card px-5 py-6">
             <p className="text-sm text-white/54">{card.label}</p>
-            <p className="mt-3 font-serif text-4xl text-white">{card.value}</p>
+            <p className="mt-3 font-serif text-4xl tracking-[-0.04em] text-white">
+              {card.value}
+            </p>
           </div>
         ))}
       </section>
@@ -40,16 +46,16 @@ export default async function AdminOverviewPage() {
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/admin/events/new" className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black">
+            <Link href="/admin/events/new" className="admin-button">
               New event
             </Link>
-            <Link href="/admin/duplicates" className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72">
+            <Link href="/admin/duplicates" className="admin-button-muted">
               Review duplicates
             </Link>
-            <Link href="/admin/imports" className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72">
+            <Link href="/admin/imports" className="admin-button-muted">
               Import jobs
             </Link>
-            <Link href="/admin/uploads" className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72">
+            <Link href="/admin/uploads" className="admin-button-muted">
               Upload photos
             </Link>
           </div>
@@ -60,7 +66,7 @@ export default async function AdminOverviewPage() {
             <Link
               key={event.id}
               href={`/admin/events/${event.id}`}
-              className="rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-4"
+              className="rounded-[1.25rem] border border-white/8 bg-white/4 px-4 py-4 transition hover:border-white/14 hover:bg-white/[0.06]"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>

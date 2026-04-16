@@ -68,7 +68,7 @@ export function PublicPhotoSearchLauncher({
   const activeResult = results[activeIndex] ?? null;
   const triggerClasses =
     triggerClassName ??
-    "inline-flex items-center justify-center rounded-full border border-white/10 bg-white/6 px-3 py-2 text-white/80 backdrop-blur-xl transition hover:bg-white/10";
+    "floating-action inline-flex items-center justify-center gap-2 px-3.5 py-2.5 text-white/80 transition hover:bg-white/12";
 
   const resultCountLabel = useMemo(() => {
     if (!deferredQuery.trim()) {
@@ -219,19 +219,19 @@ export function PublicPhotoSearchLauncher({
 
       {open ? (
         <div
-          className="fixed inset-0 z-[80] bg-black/72 px-4 py-6 backdrop-blur-2xl sm:px-6 sm:py-8"
+          className="fixed inset-0 z-[80] bg-black/76 px-3 py-4 backdrop-blur-2xl sm:px-6 sm:py-8"
           onClick={() => closeSearch()}
         >
           <div
-            className="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#070707]/96 shadow-[0_40px_140px_rgba(0,0,0,0.5)]"
+            className="solid-panel mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-label="Search public photos"
           >
-            <div className="border-b border-white/8 px-4 py-4 sm:px-6">
+            <div className="border-b border-white/8 px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex items-center gap-3">
-                <div className="glass-chip flex items-center gap-2 px-3 py-2 text-white/78">
+                <div className="glass-chip px-3 py-2 text-white/78">
                   <Search size={16} />
                   <span className="hidden text-xs uppercase tracking-[0.28em] sm:inline">
                     Search
@@ -273,7 +273,7 @@ export function PublicPhotoSearchLauncher({
                       navigateToResult(activeResult.href);
                     }
                   }}
-                  className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/36 sm:text-lg"
+                  className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/34 sm:text-lg"
                   placeholder="Search by character, event, year, species, maker, or general tag"
                 />
                 <button
@@ -285,15 +285,15 @@ export function PublicPhotoSearchLauncher({
                   <X size={18} />
                 </button>
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.26em] text-white/42">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[0.68rem] uppercase tracking-[0.26em] text-white/42">
                 <p>{resultCountLabel}</p>
-                <p className="text-white/34">/ or Ctrl+K to open · Esc to dismiss</p>
+                <p className="hidden text-white/34 sm:block">/ or Ctrl+K to open · Esc to dismiss</p>
               </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
               {!query.trim() ? (
-                <div className="flex h-full min-h-56 items-center justify-center rounded-[1.6rem] border border-white/8 bg-white/[0.03] px-6 text-center text-sm leading-7 text-white/54">
+                <div className="muted-panel flex h-full min-h-56 items-center justify-center px-6 text-center text-sm leading-7 text-white/54">
                   Search narrows live across public photos using typed tags, event titles,
                   and year-like terms. Results stay photo-first and keep hidden content
                   out of the public index.
@@ -311,8 +311,8 @@ export function PublicPhotoSearchLauncher({
                         onClick={() => navigateToResult(result.href)}
                         className={`grid w-full gap-4 rounded-[1.45rem] border px-3 py-3 text-left transition sm:grid-cols-[5.25rem_minmax(0,1fr)] sm:px-4 ${
                           isActive
-                            ? "border-white/18 bg-white/9"
-                            : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
+                            ? "border-white/18 bg-white/8 shadow-[0_18px_50px_rgba(0,0,0,0.2)]"
+                            : "border-white/8 bg-white/[0.03] hover:border-white/12 hover:bg-white/[0.06]"
                         }`}
                       >
                         <div
@@ -330,6 +330,7 @@ export function PublicPhotoSearchLauncher({
                           ) : (
                             <div className="absolute inset-0 bg-[linear-gradient(145deg,_rgba(255,255,255,0.06),_rgba(255,255,255,0.02))]" />
                           )}
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_36%,_rgba(0,0,0,0.16)_100%)]" />
                         </div>
 
                         <div className="min-w-0 space-y-2">
@@ -371,7 +372,7 @@ export function PublicPhotoSearchLauncher({
                   })}
                 </div>
               ) : (
-                <div className="flex h-full min-h-56 items-center justify-center rounded-[1.6rem] border border-white/8 bg-white/[0.03] px-6 text-center text-sm leading-7 text-white/54">
+                <div className="muted-panel flex h-full min-h-56 items-center justify-center px-6 text-center text-sm leading-7 text-white/54">
                   {loading
                     ? "Searching public photographs..."
                     : error ?? "No public photos match this combination yet."}

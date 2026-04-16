@@ -5,6 +5,16 @@
   --foreground: #f3f0eb;
   --line: rgba(255, 255, 255, 0.1);
   --accent: #c5965c;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface-strong: rgba(255, 255, 255, 0.055);
+  --surface-muted: rgba(255, 255, 255, 0.025);
+  --panel: rgba(10, 10, 10, 0.84);
+  --panel-soft: rgba(15, 15, 15, 0.72);
+  --shadow-soft: 0 18px 48px rgba(0, 0, 0, 0.22);
+  --shadow-panel: 0 28px 90px rgba(0, 0, 0, 0.3);
+  --shadow-hero: 0 40px 140px rgba(0, 0, 0, 0.38);
+  --radius-panel: 1.75rem;
+  --radius-pill: 999px;
 }
 
 @theme inline {
@@ -28,41 +38,62 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), sans-serif;
+  min-height: 100vh;
+  text-rendering: optimizeLegibility;
 }
 
 .glass-panel {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.12),
-    rgba(255, 255, 255, 0.06)
+    rgba(255, 255, 255, 0.05)
   );
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(20px) saturate(120%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 18px 60px rgba(0, 0, 0, 0.28);
+    0 24px 72px rgba(0, 0, 0, 0.32);
 }
 
 .glass-chip {
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  padding: 0.6rem 0.9rem;
-  backdrop-filter: blur(18px);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.05)
+  );
+  padding: 0.65rem 0.95rem;
+  backdrop-filter: blur(18px) saturate(118%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 40px rgba(0, 0, 0, 0.18);
 }
 
 .viewer-control {
   display: inline-flex;
-  height: 2.65rem;
-  width: 2.65rem;
+  height: 2.9rem;
+  width: 2.9rem;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
   color: rgba(255, 255, 255, 0.86);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
 }
 
 .viewer-control:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.08);
+  color: white;
+  transform: translateY(-1px);
 }
 
 .viewer-control:disabled {
@@ -76,21 +107,153 @@ body {
 
 .editorial-label {
   text-transform: uppercase;
-  letter-spacing: 0.35em;
-  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.32em;
+  color: rgba(255, 255, 255, 0.42);
   font-size: 0.68rem;
+}
+
+.editorial-kicker {
+  font-size: 0.78rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.solid-panel {
+  border-radius: var(--radius-panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    var(--panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.muted-panel {
+  border-radius: calc(var(--radius-panel) - 0.15rem);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.018)),
+    rgba(8, 8, 8, 0.42);
+}
+
+.floating-action {
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.04)
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 44px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px) saturate(120%);
+}
+
+.admin-button,
+.admin-button-muted,
+.admin-button-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-pill);
+  padding: 0.68rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.admin-button:hover:not(:disabled),
+.admin-button-muted:hover:not(:disabled),
+.admin-button-danger:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.admin-button {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #f3f0eb;
+  color: #080808;
+  box-shadow: 0 14px 36px rgba(243, 240, 235, 0.12);
+}
+
+.admin-button:hover:not(:disabled) {
+  background: white;
+}
+
+.admin-button-muted {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.admin-button-muted:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.admin-button-danger {
+  border: 1px solid rgba(248, 113, 113, 0.34);
+  background: rgba(239, 68, 68, 0.12);
+  color: rgb(254 226 226);
+}
+
+.admin-button-danger:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.admin-button:disabled,
+.admin-button-muted:disabled,
+.admin-button-danger:disabled {
+  opacity: 0.4;
+  transform: none;
+}
+
+.admin-note,
+.admin-note-error {
+  border-radius: 1.25rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.92rem;
+}
+
+.admin-note {
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  background: rgba(16, 185, 129, 0.1);
+  color: rgb(209 250 229);
+}
+
+.admin-note-error {
+  border: 1px solid rgba(197, 150, 92, 0.32);
+  background: rgba(197, 150, 92, 0.1);
+  color: rgb(243 209 170);
 }
 
 .admin-input,
 .admin-textarea,
 .admin-select {
   width: 100%;
-  border-radius: 1rem;
+  border-radius: 1.05rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.045);
   padding: 0.95rem 1rem;
   color: white;
   outline: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.admin-input::placeholder,
+.admin-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.34);
 }
 
 .admin-input:focus,
@@ -98,6 +261,7 @@ body {
 .admin-select:focus {
   border-color: rgba(197, 150, 92, 0.7);
   box-shadow: 0 0 0 1px rgba(197, 150, 92, 0.6);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .admin-textarea {
@@ -106,10 +270,25 @@ body {
 }
 
 .admin-card {
-  border-radius: 1.75rem;
+  border-radius: var(--radius-panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)),
-    rgba(0, 0, 0, 0.28);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.22);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02)),
+    var(--panel-soft);
+  box-shadow: var(--shadow-panel);
+}
+
+@media (max-width: 640px) {
+  .section-shell {
+    width: min(100% - 1rem, 80rem);
+  }
+
+  .glass-chip {
+    padding-inline: 0.8rem;
+  }
+
+  .viewer-control {
+    height: 2.8rem;
+    width: 2.8rem;
+  }
 }

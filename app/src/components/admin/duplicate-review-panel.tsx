@@ -508,29 +508,17 @@ export function DuplicateReviewPanel({
           </select>
 
           <div className="flex gap-2">
-            <button
-              type="submit"
-              className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black"
-            >
+            <button type="submit" className="admin-button">
               Apply
             </button>
-            <Link
-              href="/admin/duplicates"
-              className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72"
-            >
+            <Link href="/admin/duplicates" className="admin-button-muted">
               Clear
             </Link>
           </div>
         </form>
 
         {notice ? (
-          <p
-            className={`rounded-2xl px-4 py-3 text-sm ${
-              notice.tone === "success"
-                ? "border border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
-                : "border border-[#c5965c]/30 bg-[#c5965c]/10 text-[#f3d1aa]"
-            }`}
-          >
+          <p className={notice.tone === "success" ? "admin-note" : "admin-note-error"}>
             {notice.text}
           </p>
         ) : null}
@@ -619,7 +607,7 @@ export function DuplicateReviewPanel({
                         type="button"
                         onClick={() => void reviewGroup(group.hash, "KEEP_BOTH")}
                         disabled={pendingAction !== null}
-                        className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-50"
+                        className="admin-button-muted"
                       >
                         {pendingAction === `review:KEEP_BOTH:${group.hash}`
                           ? "Saving..."
@@ -629,7 +617,7 @@ export function DuplicateReviewPanel({
                         type="button"
                         onClick={() => void reviewGroup(group.hash, "DISMISSED")}
                         disabled={pendingAction !== null}
-                        className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-50"
+                        className="admin-button-muted"
                       >
                         {pendingAction === `review:DISMISSED:${group.hash}`
                           ? "Saving..."
@@ -668,7 +656,7 @@ export function DuplicateReviewPanel({
                         <button
                           type="button"
                           onClick={() => toggleGroupSelection(group.hash, allPhotoIds)}
-                          className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72"
+                          className="admin-button-muted"
                         >
                           {allSelected ? "Clear group selection" : "Select group"}
                         </button>
@@ -680,7 +668,7 @@ export function DuplicateReviewPanel({
                             selectedCount === 0 ||
                             selectedCount === group.photoCount
                           }
-                          className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                          className="admin-button-muted"
                         >
                           {pendingAction === `resolve:${group.hash}`
                             ? "Resolving..."
@@ -715,7 +703,7 @@ export function DuplicateReviewPanel({
                             selectedCount === 0 ||
                             !moveDestination
                           }
-                          className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                          className="admin-button-muted"
                         >
                           {pendingAction === `move:${group.hash}`
                             ? "Moving..."
@@ -861,13 +849,13 @@ export function DuplicateReviewPanel({
                             <div className="flex flex-wrap gap-2 pt-1">
                               <Link
                                 href={`/admin/events/${photo.event.id}`}
-                                className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72"
+                                className="admin-button-muted"
                               >
                                 Open event
                               </Link>
                               <Link
                                 href={`/p/${photo.id}`}
-                                className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72"
+                                className="admin-button-muted"
                               >
                                 Open photo
                               </Link>
@@ -889,7 +877,7 @@ export function DuplicateReviewPanel({
       </section>
 
       {totalPages > 1 ? (
-        <nav className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-white/8 bg-white/4 px-5 py-4 text-sm text-white/68">
+        <nav className="muted-panel flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-white/68">
           <Link
             href={buildHref(filters, {
               page: Math.max(1, filters.page - 1),

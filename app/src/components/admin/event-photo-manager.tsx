@@ -232,7 +232,7 @@ function EventPhotoCard({
 
   return (
     <article
-      className={`overflow-hidden rounded-[1.5rem] border transition ${
+      className={`overflow-hidden rounded-[1.5rem] border shadow-[0_18px_54px_rgba(0,0,0,0.18)] transition ${
         selected ? "border-white/18 bg-white/7" : "border-white/8 bg-white/4"
       }`}
     >
@@ -317,7 +317,7 @@ function EventPhotoCard({
                   })
                 }
                 disabled={actionLocked || photo.sortOrder === 0}
-                className="rounded-full border border-white/10 bg-white/4 px-3 py-2 text-sm text-white disabled:opacity-40"
+                className="admin-button-muted px-3 py-2 text-sm"
               >
                 {pendingAction === `move-earlier:${photo.id}` ? "Moving..." : "Earlier"}
               </button>
@@ -352,7 +352,7 @@ function EventPhotoCard({
                   })
                 }
                 disabled={actionLocked || photo.sortOrder >= totalPhotos - 1}
-                className="rounded-full border border-white/10 bg-white/4 px-3 py-2 text-sm text-white disabled:opacity-40"
+                className="admin-button-muted px-3 py-2 text-sm"
               >
                 {pendingAction === `move-later:${photo.id}` ? "Moving..." : "Later"}
               </button>
@@ -380,7 +380,7 @@ function EventPhotoCard({
                   })
                 }
                 disabled={actionLocked || !canSetCover}
-                className="rounded-full border border-white/10 bg-white/4 px-3 py-2 text-sm text-white disabled:opacity-40"
+                className="admin-button-muted px-3 py-2 text-sm"
               >
                 {pendingAction === `set-cover:${photo.id}`
                   ? "Saving..."
@@ -459,7 +459,7 @@ function EventPhotoCard({
           <div className="flex flex-wrap gap-2">
             <Link
               href={`/p/${photo.id}`}
-              className="rounded-full border border-white/10 bg-white/4 px-3 py-2 text-sm text-white/72"
+              className="admin-button-muted px-3 py-2 text-sm"
             >
               Open photo page
             </Link>
@@ -487,7 +487,7 @@ function EventPhotoCard({
                 })
               }
               disabled={actionLocked || !canReprocess}
-              className="rounded-full border border-white/10 bg-white/4 px-3 py-2 text-sm text-white disabled:opacity-40"
+              className="admin-button-muted px-3 py-2 text-sm"
             >
               {pendingAction === `reprocess:${photo.id}`
                 ? "Queueing..."
@@ -527,7 +527,7 @@ function EventPhotoCard({
             </button>
           </div>
 
-          <details className="rounded-3xl border border-white/8 bg-black/25 px-4 py-4">
+          <details className="muted-panel px-4 py-4">
             <summary className="cursor-pointer list-none text-sm text-white/78">
               Edit caption, alt text, taken time, and tags
             </summary>
@@ -576,7 +576,7 @@ function EventPhotoCard({
               <button
                 type="submit"
                 disabled={actionLocked}
-                className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                className="admin-button-muted"
               >
                 {metadataPending ? "Saving..." : "Save photo details"}
               </button>
@@ -600,7 +600,7 @@ function EventPhotoCard({
                     })
                   }
                   disabled={actionLocked || selectedTags.length === 0}
-                  className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                className="admin-button-muted"
                 >
                   {pendingAction === `tags:add:${photo.id}` ? "Saving..." : "Add selected tags"}
                 </button>
@@ -608,7 +608,7 @@ function EventPhotoCard({
                   type="button"
                   onClick={() => setSelectedTags([])}
                   disabled={actionLocked || selectedTags.length === 0}
-                  className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72 disabled:opacity-40"
+                className="admin-button-muted"
                 >
                   Clear pending tags
                 </button>
@@ -1016,7 +1016,7 @@ export function EventPhotoManager({
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-6 sm:space-y-7">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="space-y-2">
           <p className="editorial-label">Photo Management</p>
@@ -1038,7 +1038,7 @@ export function EventPhotoManager({
           {duplicateCandidateCount > 0 ? (
             <Link
               href={`/admin/duplicates?scope=EVENT&eventId=${eventId}`}
-              className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-white/78"
+              className="admin-button-muted"
             >
               {duplicateCandidateCount} duplicate groups
             </Link>
@@ -1066,7 +1066,7 @@ export function EventPhotoManager({
                 type="button"
                 onClick={() => void resetAutomaticOrder()}
                 disabled={pendingAction !== null}
-                className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                className="admin-button-muted"
               >
                 {pendingAction === "reset-order"
                   ? "Restoring..."
@@ -1074,10 +1074,10 @@ export function EventPhotoManager({
               </button>
             ) : null}
             {duplicateCandidateCount > 0 ? (
-              <Link
-                href={`/admin/duplicates?scope=EVENT&eventId=${eventId}`}
-                className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72"
-              >
+               <Link
+                 href={`/admin/duplicates?scope=EVENT&eventId=${eventId}`}
+                 className="admin-button-muted"
+               >
                 Review duplicates
               </Link>
             ) : null}
@@ -1108,36 +1108,24 @@ export function EventPhotoManager({
             ))}
           </select>
           <div className="flex gap-2">
-            <button
-              type="submit"
-              className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black"
-            >
+            <button type="submit" className="admin-button">
               Apply
             </button>
-            <Link
-              href={`/admin/events/${eventId}`}
-              className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72"
-            >
+            <Link href={`/admin/events/${eventId}`} className="admin-button-muted">
               Clear
             </Link>
           </div>
         </form>
 
         {notice ? (
-          <p
-            className={`rounded-2xl px-4 py-3 text-sm ${
-              notice.tone === "success"
-                ? "border border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
-                : "border border-[#c5965c]/30 bg-[#c5965c]/10 text-[#f3d1aa]"
-            }`}
-          >
+          <p className={notice.tone === "success" ? "admin-note" : "admin-note-error"}>
             {notice.text}
           </p>
         ) : null}
 
         {photos.length ? (
           <>
-            <div className="rounded-[1.5rem] border border-white/8 bg-black/25 px-5 py-5">
+            <div className="muted-panel px-5 py-5">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="space-y-2">
                   <p className="editorial-label">Selection</p>
@@ -1150,7 +1138,7 @@ export function EventPhotoManager({
                 <button
                   type="button"
                   onClick={togglePageSelection}
-                  className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72"
+                  className="admin-button-muted"
                 >
                   {allPageSelected ? "Clear page selection" : "Select page"}
                 </button>
@@ -1166,7 +1154,7 @@ export function EventPhotoManager({
                       })
                     }
                     disabled={pendingAction !== null || selectedReadyCount !== 1}
-                    className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                    className="admin-button-muted"
                   >
                     {pendingAction === "bulk:set-cover"
                       ? "Saving..."
@@ -1180,7 +1168,7 @@ export function EventPhotoManager({
                       })
                     }
                     disabled={pendingAction !== null || selectedFailedCount === 0}
-                    className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                    className="admin-button-muted"
                   >
                     {pendingAction === "bulk:retry-failed"
                       ? "Queueing..."
@@ -1194,7 +1182,7 @@ export function EventPhotoManager({
                       })
                     }
                     disabled={pendingAction !== null || selectedReadyCount === 0}
-                    className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                    className="admin-button-muted"
                   >
                     {pendingAction === "bulk:reprocess-ready"
                       ? "Queueing..."
@@ -1217,7 +1205,7 @@ export function EventPhotoManager({
                   </button>
                 </div>
 
-                <div className="rounded-[1.25rem] border border-white/8 bg-white/[0.03] px-4 py-4">
+                <div className="rounded-[1.25rem] border border-white/8 bg-white/[0.03] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                   <p className="text-xs uppercase tracking-[0.22em] text-white/38">
                     Move selected
                   </p>
@@ -1243,7 +1231,7 @@ export function EventPhotoManager({
                         pageSelectedIds.length === 0 ||
                         !moveDestinationEvent
                       }
-                      className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                      className="admin-button-muted"
                     >
                       {pendingAction === "bulk:move-to-event"
                         ? "Moving..."
@@ -1258,7 +1246,7 @@ export function EventPhotoManager({
                 </div>
               </div>
 
-              <details className="mt-4 rounded-3xl border border-white/8 bg-white/[0.03] px-4 py-4">
+              <details className="muted-panel mt-4 px-4 py-4">
                 <summary className="cursor-pointer list-none text-sm text-white/78">
                   Bulk editorial fields
                 </summary>
@@ -1293,7 +1281,7 @@ export function EventPhotoManager({
                           });
                         }}
                         disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                        className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                        className="admin-button-muted"
                       >
                         {pendingAction === "bulk:set-caption"
                           ? "Saving..."
@@ -1307,7 +1295,7 @@ export function EventPhotoManager({
                           })
                         }
                         disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                        className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                        className="admin-button-muted"
                       >
                         {pendingAction === "bulk:clear-caption"
                           ? "Clearing..."
@@ -1346,7 +1334,7 @@ export function EventPhotoManager({
                           });
                         }}
                         disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                        className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                        className="admin-button-muted"
                       >
                         {pendingAction === "bulk:set-alt-text"
                           ? "Saving..."
@@ -1360,7 +1348,7 @@ export function EventPhotoManager({
                           })
                         }
                         disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                        className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                        className="admin-button-muted"
                       >
                         {pendingAction === "bulk:clear-alt-text"
                           ? "Clearing..."
@@ -1374,7 +1362,7 @@ export function EventPhotoManager({
                           })
                         }
                         disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                        className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                        className="admin-button-muted"
                       >
                         {pendingAction === "bulk:clear-taken-at-override"
                           ? "Clearing..."
@@ -1385,7 +1373,7 @@ export function EventPhotoManager({
                 </div>
               </details>
 
-              <details className="mt-4 rounded-3xl border border-white/8 bg-white/[0.03] px-4 py-4">
+              <details className="muted-panel mt-4 px-4 py-4">
                 <summary className="cursor-pointer list-none text-sm text-white/78">
                   Bulk tags
                 </summary>
@@ -1406,7 +1394,7 @@ export function EventPhotoManager({
                         pageSelectedIds.length === 0 ||
                         bulkTags.length === 0
                       }
-                      className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                      className="admin-button-muted"
                     >
                       {pendingAction === "bulk:add-tags"
                         ? "Saving..."
@@ -1420,7 +1408,7 @@ export function EventPhotoManager({
                         pageSelectedIds.length === 0 ||
                         bulkTags.length === 0
                       }
-                      className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white disabled:opacity-40"
+                      className="admin-button-muted"
                     >
                       {pendingAction === "bulk:remove-tags"
                         ? "Removing..."
@@ -1430,7 +1418,7 @@ export function EventPhotoManager({
                       type="button"
                       onClick={() => setBulkTags([])}
                       disabled={pendingAction !== null || bulkTags.length === 0}
-                      className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72 disabled:opacity-40"
+                className="admin-button-muted"
                     >
                       Clear pending tags
                     </button>
@@ -1459,7 +1447,7 @@ export function EventPhotoManager({
             </div>
 
             {pagination.totalPages > 1 ? (
-              <nav className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-white/8 bg-white/4 px-5 py-4 text-sm text-white/68">
+              <nav className="muted-panel flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-white/68">
                 <Link
                   href={buildEventHref(eventId, filters, {
                     page: Math.max(1, filters.page - 1),
@@ -1491,7 +1479,7 @@ export function EventPhotoManager({
             ) : null}
           </>
         ) : (
-          <div className="rounded-[1.5rem] border border-white/8 bg-white/4 px-5 py-8 text-sm text-white/58">
+          <div className="muted-panel px-5 py-8 text-sm text-white/58">
             No photos matched the current filters.
           </div>
         )}
