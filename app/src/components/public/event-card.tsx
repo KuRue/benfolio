@@ -24,39 +24,32 @@ export function EventCard({ event }: EventCardProps) {
   return (
     <Link
       href={`/e/${event.slug}`}
-      className="group relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/4 shadow-[0_22px_70px_rgba(0,0,0,0.24)] transition duration-300 hover:-translate-y-1 hover:border-white/16 hover:shadow-[0_32px_95px_rgba(0,0,0,0.34)]"
+      className="group relative overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/4 shadow-[0_18px_56px_rgba(0,0,0,0.22)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16 hover:shadow-[0_26px_80px_rgba(0,0,0,0.3)]"
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(197,146,92,0.24),_transparent_32%),linear-gradient(145deg,_#111,_#050505)]">
         {coverUrl ? (
           <img
             src={coverUrl}
             alt=""
-            className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.035] group-hover:saturate-[1.03]"
+            className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03] group-hover:saturate-[1.03]"
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/12 to-transparent" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_35%,_rgba(0,0,0,0.24)_100%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
-        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 lg:p-6">
-          <div className="glass-panel inline-flex items-center gap-3 rounded-full px-3.5 py-2 text-[0.68rem] uppercase tracking-[0.3em] text-white/62">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/14 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_35%,_rgba(0,0,0,0.18)_100%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 lg:p-5">
+          <div className="glass-panel inline-flex items-center gap-3 rounded-full px-3.5 py-2 text-[0.66rem] uppercase tracking-[0.28em] text-white/66">
             <span>{formatLongDate(event.eventDate)}</span>
-            <span className="h-1 w-1 rounded-full bg-white/40" />
+            <span className="h-1 w-1 rounded-full bg-white/36" />
             <span>{event._count.photos} photos</span>
           </div>
-          <div className="mt-3 rounded-[1.45rem] border border-white/10 bg-black/28 px-4 py-4 shadow-[0_18px_50px_rgba(0,0,0,0.2)] backdrop-blur-[8px] sm:px-5 sm:py-5">
-            <div className="space-y-2.5">
-              <h2 className="font-serif text-[1.9rem] leading-[0.96] tracking-[-0.03em] text-white sm:text-[2.15rem]">
+          <div className="mt-3 rounded-[1.3rem] border border-white/10 bg-black/24 px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.2)] backdrop-blur-[7px] sm:px-5 sm:py-4.5">
+            <div className="space-y-2">
+              <h2 className="font-serif text-[1.85rem] leading-[0.96] tracking-[-0.03em] text-white sm:text-[2.05rem]">
                 {event.title}
               </h2>
-              {event.location ? (
-                <p className="text-[0.72rem] uppercase tracking-[0.3em] text-white/52 sm:text-xs">
-                  {event.location}
-                </p>
-              ) : null}
-              {event.description ? (
-                <p className="max-w-xl text-sm leading-6 text-white/64 sm:text-[0.95rem]">
-                  {event.description}
-                </p>
-              ) : null}
+              <p className="text-[0.72rem] uppercase tracking-[0.28em] text-white/52 sm:text-xs">
+                {event.location ?? event.slug}
+              </p>
             </div>
           </div>
         </div>

@@ -14,21 +14,13 @@ export default async function AdminSettingsPage() {
         <h1 className="font-serif text-4xl tracking-[-0.03em] text-white">
           Homepage profile
         </h1>
-        <p className="max-w-2xl text-sm leading-7 text-white/58">
-          Control the profile header that introduces the public archive before the
-          event grid.
+        <p className="max-w-2xl text-sm text-white/58">
+          Adjust the public header.
         </p>
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="editorial-label">Preview</p>
-            <h2 className="mt-2 font-serif text-2xl tracking-[-0.03em] text-white">
-              Public homepage header
-            </h2>
-          </div>
-        </div>
+        <p className="editorial-label">Preview</p>
         <SiteHeader profile={siteProfile} showSearch={false} />
       </section>
 

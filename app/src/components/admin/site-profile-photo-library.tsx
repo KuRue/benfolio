@@ -109,16 +109,15 @@ export function SiteProfilePhotoLibrary({
         <div className="space-y-2">
           <p className="editorial-label">Processed Library</p>
           <h2 className="font-serif text-3xl tracking-[-0.03em] text-white">
-            Choose hero and avatar from existing photos
+            Pick hero and avatar
           </h2>
-          <p className="max-w-2xl text-sm leading-7 text-white/58">
-            Reuse finished derivatives first so the public homepage stays visually
-            consistent with the gallery.
+          <p className="max-w-2xl text-sm text-white/58">
+            Reuse processed photos first.
           </p>
         </div>
 
         <label className="block w-full max-w-sm space-y-2">
-          <span className="text-sm text-white/68">Search the library</span>
+          <span className="text-sm text-white/68">Search</span>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -222,7 +221,7 @@ export function SiteProfilePhotoLibrary({
         </div>
       ) : (
         <div className="rounded-[1.5rem] border border-white/8 bg-white/4 px-5 py-8 text-sm text-white/58">
-          No processed photos matched the current search yet.
+          No photos match this search.
         </div>
       )}
     </section>

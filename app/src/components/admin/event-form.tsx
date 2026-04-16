@@ -6,7 +6,7 @@ import type { EventActionState } from "@/app/admin/actions";
 
 type EventFormProps = {
   title: string;
-  description: string;
+  description?: string;
   submitLabel: string;
   action: (
     state: EventActionState,
@@ -40,7 +40,9 @@ export function EventForm({
         <h1 className="font-serif text-4xl tracking-[-0.03em] text-white">
           {title}
         </h1>
-        <p className="max-w-2xl text-sm leading-7 text-white/58">{description}</p>
+        {description ? (
+          <p className="max-w-2xl text-sm text-white/58">{description}</p>
+        ) : null}
       </div>
 
       {state.error ? (
@@ -120,7 +122,7 @@ export function EventForm({
             name="description"
             defaultValue={initialValues?.description}
             className="admin-textarea"
-            placeholder="Short editorial summary for the public event page."
+            placeholder="Optional public note"
           />
         </label>
 

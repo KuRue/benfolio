@@ -17,7 +17,7 @@ export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap gap-2 rounded-[1.4rem] border border-white/8 bg-white/[0.03] p-2">
+    <nav className="flex flex-wrap gap-2 rounded-[1.2rem] border border-white/8 bg-white/[0.025] p-1.5">
       {navItems.map((item) => {
         const active =
           pathname === item.href ||

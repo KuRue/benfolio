@@ -43,7 +43,7 @@ export function PhotoViewerShell({
   isModal = false,
 }: PhotoViewerShellProps) {
   const heading = viewer.title ?? viewer.event.title;
-  const subtitle = viewer.caption ?? "High-resolution viewer with download access.";
+  const subtitle = viewer.caption ?? (viewer.title ? viewer.event.title : "");
   const infoRows = [
     viewer.capturedAt
       ? { label: "Captured", value: formatLongDate(viewer.capturedAt) }

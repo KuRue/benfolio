@@ -435,40 +435,19 @@ export function DuplicateReviewPanel({
       <section className="space-y-3">
         <p className="editorial-label">Duplicate Review</p>
         <h1 className="font-serif text-4xl tracking-[-0.03em] text-white">
-          Exact-hash duplicate candidates
+          Exact-hash duplicates
         </h1>
-        <p className="max-w-3xl text-sm leading-7 text-white/58">
-          Duplicate groups are built from exact SHA-256 matches on stored photos. No
-          files are removed automatically. Review a group, keep intentional matches,
-          move mistakes into the right event, or delete extras deliberately.
+        <p className="max-w-3xl text-sm text-white/58">
+          Review, move, or remove exact matches.
         </p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="admin-card px-5 py-6">
-          <p className="text-sm text-white/54">Visible groups</p>
-          <p className="mt-3 font-serif text-4xl text-white">{totalGroups}</p>
-        </div>
-        <div className="admin-card px-5 py-6">
-          <p className="text-sm text-white/54">Scope</p>
-          <p className="mt-3 font-serif text-4xl text-white">
-            {filters.scope === "EVENT" ? "Event" : "Library"}
-          </p>
-        </div>
-        <div className="admin-card px-5 py-6">
-          <p className="text-sm text-white/54">Visibility</p>
-          <p className="mt-3 font-serif text-4xl text-white">
-            {filters.visibility === "ALL" ? "All" : "Active"}
-          </p>
-        </div>
-      </section>
-
       <section className="admin-card space-y-5 px-6 py-6">
-        <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="editorial-label">Filters</p>
-          <h2 className="font-serif text-3xl tracking-[-0.03em] text-white">
-            Focus review work
-          </h2>
+          <p className="text-sm text-white/54">
+            {totalGroups} groups · {filters.scope === "EVENT" ? "Event" : "Library"} · {filters.visibility === "ALL" ? "All" : "Active"}
+          </p>
         </div>
 
         <form

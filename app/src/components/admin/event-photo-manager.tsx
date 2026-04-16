@@ -393,19 +393,18 @@ function EventPhotoCard({
 
           <div className="grid gap-2 text-sm text-white/58 sm:grid-cols-2">
             <p>
-              Effective order time:{" "}
+              Order time:{" "}
               <span className="text-white/74">{formatDateTime(photo.effectiveTakenAt)}</span>
             </p>
             <p>
-              Upload time:{" "}
-              <span className="text-white/74">{formatDateTime(photo.createdAt)}</span>
+              Uploaded: <span className="text-white/74">{formatDateTime(photo.createdAt)}</span>
             </p>
             <p>
               EXIF taken:{" "}
               <span className="text-white/74">{formatDateTime(photo.capturedAt)}</span>
             </p>
             <p>
-              Taken override:{" "}
+              Override:{" "}
               <span className="text-white/74">
                 {photo.takenAtOverride ? formatDateTime(photo.takenAtOverride) : "Not set"}
               </span>
@@ -529,7 +528,7 @@ function EventPhotoCard({
 
           <details className="muted-panel px-4 py-4">
             <summary className="cursor-pointer list-none text-sm text-white/78">
-              Edit caption, alt text, taken time, and tags
+              Edit details
             </summary>
             <form
               className="mt-4 space-y-3"
@@ -553,32 +552,39 @@ function EventPhotoCard({
                 />
               </label>
 
-              <label className="block space-y-2">
-                <span className="text-sm text-white/68">Alt text</span>
-                <input
-                  value={altText}
-                  onChange={(event) => setAltText(event.target.value)}
-                  className="admin-input"
-                  placeholder="Describe the photograph for screen readers"
-                />
-              </label>
+              <details className="rounded-[1.05rem] border border-white/8 bg-white/[0.025] px-4 py-4">
+                <summary className="cursor-pointer list-none text-sm text-white/64">
+                  Advanced
+                </summary>
+                <div className="mt-4 space-y-3">
+                  <label className="block space-y-2">
+                    <span className="text-sm text-white/68">Alt text</span>
+                    <input
+                      value={altText}
+                      onChange={(event) => setAltText(event.target.value)}
+                      className="admin-input"
+                      placeholder="Optional screen reader copy"
+                    />
+                  </label>
 
-              <label className="block space-y-2">
-                <span className="text-sm text-white/68">Taken time override</span>
-                <input
-                  type="datetime-local"
-                  value={takenAtOverride}
-                  onChange={(event) => setTakenAtOverride(event.target.value)}
-                  className="admin-input"
-                />
-              </label>
+                  <label className="block space-y-2">
+                    <span className="text-sm text-white/68">Taken time override</span>
+                    <input
+                      type="datetime-local"
+                      value={takenAtOverride}
+                      onChange={(event) => setTakenAtOverride(event.target.value)}
+                      className="admin-input"
+                    />
+                  </label>
+                </div>
+              </details>
 
               <button
                 type="submit"
                 disabled={actionLocked}
                 className="admin-button-muted"
               >
-                {metadataPending ? "Saving..." : "Save photo details"}
+                {metadataPending ? "Saving..." : "Save changes"}
               </button>
             </form>
 
@@ -587,8 +593,8 @@ function EventPhotoCard({
                 selectedTags={selectedTags}
                 onChange={setSelectedTags}
                 disabled={actionLocked}
-                label="Add tags to this photo"
-                placeholder="Search or create tags for this photo"
+                label="Tags"
+                placeholder="Search or create tags"
               />
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -600,17 +606,17 @@ function EventPhotoCard({
                     })
                   }
                   disabled={actionLocked || selectedTags.length === 0}
-                className="admin-button-muted"
+                  className="admin-button-muted"
                 >
-                  {pendingAction === `tags:add:${photo.id}` ? "Saving..." : "Add selected tags"}
+                  {pendingAction === `tags:add:${photo.id}` ? "Saving..." : "Add tags"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedTags([])}
                   disabled={actionLocked || selectedTags.length === 0}
-                className="admin-button-muted"
+                  className="admin-button-muted"
                 >
-                  Clear pending tags
+                  Clear
                 </button>
               </div>
             </div>
@@ -1023,10 +1029,8 @@ export function EventPhotoManager({
           <h2 className="font-serif text-3xl tracking-[-0.03em] text-white">
             Event library
           </h2>
-          <p className="max-w-3xl text-sm leading-7 text-white/58">
-            Review processing state, tune metadata, set the event cover, and make
-            intentional order changes without breaking the public event page at{" "}
-            <span className="text-white/76">/e/{eventSlug}</span>.
+          <p className="max-w-3xl text-sm text-white/58">
+            Sort, cover, tags, and cleanup for <span className="text-white/76">/e/{eventSlug}</span>.
           </p>
         </div>
 
@@ -1051,8 +1055,8 @@ export function EventPhotoManager({
           <div className="space-y-2">
             <p className="text-sm text-white/68">
               {photoOrderMode === "MANUAL"
-                ? "Manual ordering is active. Move controls set the public oldest-to-newest order explicitly."
-                : "Automatic ordering is active. Public order follows taken time override, then EXIF time, then upload time."}
+                ? "Manual order is active."
+                : "Automatic order follows taken time, EXIF time, then upload time."}
             </p>
             <p className="text-sm text-white/52">
               Showing {pagination.pagePhotoCount} of {summary.filteredCount} filtered photos
@@ -1094,7 +1098,7 @@ export function EventPhotoManager({
             name="q"
             defaultValue={filters.query}
             className="admin-input"
-            placeholder="Search by filename, caption, alt text, tag, or ID"
+            placeholder="Search filename, caption, tag, or ID"
           />
           <select
             name="status"
@@ -1127,12 +1131,12 @@ export function EventPhotoManager({
           <>
             <div className="muted-panel px-5 py-5">
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <p className="editorial-label">Selection</p>
                   <p className="text-sm text-white/64">
                     {pageSelectedIds.length
-                      ? `${pageSelectedIds.length} photos selected on this page`
-                      : "Select photos on this page for bulk editorial and cleanup actions."}
+                      ? `${pageSelectedIds.length} selected`
+                      : "Select photos on this page."}
                   </p>
                 </div>
                 <button
@@ -1144,111 +1148,105 @@ export function EventPhotoManager({
                 </button>
               </div>
 
-              <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)]">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void runBulkAction({
-                        action: "set-cover",
-                      })
-                    }
-                    disabled={pendingAction !== null || selectedReadyCount !== 1}
-                    className="admin-button-muted"
-                  >
-                    {pendingAction === "bulk:set-cover"
-                      ? "Saving..."
-                      : "Set selected as cover"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void runBulkAction({
-                        action: "retry-failed",
-                      })
-                    }
-                    disabled={pendingAction !== null || selectedFailedCount === 0}
-                    className="admin-button-muted"
-                  >
-                    {pendingAction === "bulk:retry-failed"
-                      ? "Queueing..."
-                      : `Retry failed${selectedFailedCount ? ` (${selectedFailedCount})` : ""}`}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void runBulkAction({
-                        action: "reprocess-ready",
-                      })
-                    }
-                    disabled={pendingAction !== null || selectedReadyCount === 0}
-                    className="admin-button-muted"
-                  >
-                    {pendingAction === "bulk:reprocess-ready"
-                      ? "Queueing..."
-                      : `Reprocess ready${selectedReadyCount ? ` (${selectedReadyCount})` : ""}`}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void runBulkAction({
-                        action: "delete",
-                        confirmText: `Delete ${pageSelectedIds.length} selected photo${pageSelectedIds.length === 1 ? "" : "s"}? Originals, derivatives, and metadata will be removed.`,
-                      })
-                    }
-                    disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                    className="rounded-full border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-100 disabled:opacity-40"
-                  >
-                    {pendingAction === "bulk:delete"
-                      ? "Deleting..."
-                      : `Delete selected${pageSelectedIds.length ? ` (${pageSelectedIds.length})` : ""}`}
-                  </button>
-                </div>
+              {pageSelectedIds.length ? (
+                <>
+                  <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)]">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runBulkAction({
+                            action: "set-cover",
+                          })
+                        }
+                        disabled={pendingAction !== null || selectedReadyCount !== 1}
+                        className="admin-button-muted"
+                      >
+                        {pendingAction === "bulk:set-cover" ? "Saving..." : "Set as cover"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runBulkAction({
+                            action: "retry-failed",
+                          })
+                        }
+                        disabled={pendingAction !== null || selectedFailedCount === 0}
+                        className="admin-button-muted"
+                      >
+                        {pendingAction === "bulk:retry-failed"
+                          ? "Queueing..."
+                          : `Retry failed${selectedFailedCount ? ` (${selectedFailedCount})` : ""}`}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runBulkAction({
+                            action: "reprocess-ready",
+                          })
+                        }
+                        disabled={pendingAction !== null || selectedReadyCount === 0}
+                        className="admin-button-muted"
+                      >
+                        {pendingAction === "bulk:reprocess-ready"
+                          ? "Queueing..."
+                          : `Reprocess${selectedReadyCount ? ` (${selectedReadyCount})` : ""}`}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runBulkAction({
+                            action: "delete",
+                            confirmText: `Delete ${pageSelectedIds.length} selected photo${pageSelectedIds.length === 1 ? "" : "s"}? Originals, derivatives, and metadata will be removed.`,
+                          })
+                        }
+                        disabled={pendingAction !== null}
+                        className="rounded-full border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-100 disabled:opacity-40"
+                      >
+                        {pendingAction === "bulk:delete"
+                          ? "Deleting..."
+                          : `Delete${pageSelectedIds.length ? ` (${pageSelectedIds.length})` : ""}`}
+                      </button>
+                    </div>
 
-                <div className="rounded-[1.25rem] border border-white/8 bg-white/[0.03] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-                  <p className="text-xs uppercase tracking-[0.22em] text-white/38">
-                    Move selected
-                  </p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                    <select
-                      value={moveDestinationEventId}
-                      onChange={(event) => setMoveDestinationEventId(event.target.value)}
-                      className="admin-select"
-                      disabled={pendingAction !== null || eventOptions.length === 0}
-                    >
-                      <option value="">Choose another event</option>
-                      {eventOptions.map((eventOption) => (
-                        <option key={eventOption.id} value={eventOption.id}>
-                          {formatEventOptionLabel(eventOption)}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => void moveSelectedPhotos()}
-                      disabled={
-                        pendingAction !== null ||
-                        pageSelectedIds.length === 0 ||
-                        !moveDestinationEvent
-                      }
-                      className="admin-button-muted"
-                    >
-                      {pendingAction === "bulk:move-to-event"
-                        ? "Moving..."
-                        : `Move selected${pageSelectedIds.length ? ` (${pageSelectedIds.length})` : ""}`}
-                    </button>
+                    <div className="rounded-[1.25rem] border border-white/8 bg-white/[0.03] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                      <p className="text-xs uppercase tracking-[0.22em] text-white/38">
+                        Move
+                      </p>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                        <select
+                          value={moveDestinationEventId}
+                          onChange={(event) => setMoveDestinationEventId(event.target.value)}
+                          className="admin-select"
+                          disabled={pendingAction !== null || eventOptions.length === 0}
+                        >
+                          <option value="">Choose another event</option>
+                          {eventOptions.map((eventOption) => (
+                            <option key={eventOption.id} value={eventOption.id}>
+                              {formatEventOptionLabel(eventOption)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => void moveSelectedPhotos()}
+                          disabled={pendingAction !== null || !moveDestinationEvent}
+                          className="admin-button-muted"
+                        >
+                          {pendingAction === "bulk:move-to-event" ? "Moving..." : "Move"}
+                        </button>
+                      </div>
+                      <p className="mt-3 text-sm text-white/52">
+                        {eventOptions.length
+                          ? "Moves keep metadata and derivatives."
+                          : "Create another event first."}
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-3 text-sm text-white/52">
-                    {eventOptions.length
-                      ? "Moves preserve derivatives, metadata, hashes, and import linkage while repairing source and destination ordering."
-                      : "Create another event first to move photos between galleries."}
-                  </p>
-                </div>
-              </div>
 
-              <details className="muted-panel mt-4 px-4 py-4">
+                  <details className="muted-panel mt-4 px-4 py-4">
                 <summary className="cursor-pointer list-none text-sm text-white/78">
-                  Bulk editorial fields
+                  Bulk captions
                 </summary>
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
                   <div className="space-y-3">
@@ -1268,7 +1266,7 @@ export function EventPhotoManager({
                           if (!bulkCaption.trim()) {
                             setNotice({
                               tone: "error",
-                              text: "Enter a caption first, or use the clear action.",
+                              text: "Enter a caption first, or clear it.",
                             });
                             return;
                           }
@@ -1304,76 +1302,77 @@ export function EventPhotoManager({
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="block space-y-2">
-                      <span className="text-sm text-white/68">Alt text</span>
-                      <input
-                        value={bulkAltText}
-                        onChange={(event) => setBulkAltText(event.target.value)}
-                        className="admin-input"
-                        placeholder="Apply one alt text value to all selected photos"
-                      />
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!bulkAltText.trim()) {
-                            setNotice({
-                              tone: "error",
-                              text: "Enter alt text first, or use the clear action.",
+                  <details className="rounded-[1.05rem] border border-white/8 bg-white/[0.025] px-4 py-4">
+                    <summary className="cursor-pointer list-none text-sm text-white/64">
+                      Accessibility and capture
+                    </summary>
+                    <div className="mt-4 space-y-3">
+                      <label className="block space-y-2">
+                        <span className="text-sm text-white/68">Alt text</span>
+                        <input
+                          value={bulkAltText}
+                          onChange={(event) => setBulkAltText(event.target.value)}
+                          className="admin-input"
+                          placeholder="Apply one alt text value"
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!bulkAltText.trim()) {
+                              setNotice({
+                                tone: "error",
+                                text: "Enter alt text first, or clear it.",
+                              });
+                              return;
+                            }
+
+                            void runBulkAction({
+                              action: "set-alt-text",
+                              payload: {
+                                altText: bulkAltText,
+                              },
                             });
-                            return;
+                          }}
+                          disabled={pendingAction !== null}
+                          className="admin-button-muted"
+                        >
+                          {pendingAction === "bulk:set-alt-text" ? "Saving..." : "Set alt text"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void runBulkAction({
+                              action: "clear-alt-text",
+                            })
                           }
-
-                          void runBulkAction({
-                            action: "set-alt-text",
-                            payload: {
-                              altText: bulkAltText,
-                            },
-                          });
-                        }}
-                        disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                        className="admin-button-muted"
-                      >
-                        {pendingAction === "bulk:set-alt-text"
-                          ? "Saving..."
-                          : "Set alt text"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void runBulkAction({
-                            action: "clear-alt-text",
-                          })
-                        }
-                        disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                        className="admin-button-muted"
-                      >
-                        {pendingAction === "bulk:clear-alt-text"
-                          ? "Clearing..."
-                          : "Clear alt text"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void runBulkAction({
-                            action: "clear-taken-at-override",
-                          })
-                        }
-                        disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                        className="admin-button-muted"
-                      >
-                        {pendingAction === "bulk:clear-taken-at-override"
-                          ? "Clearing..."
-                          : "Clear taken overrides"}
-                      </button>
+                          disabled={pendingAction !== null}
+                          className="admin-button-muted"
+                        >
+                          {pendingAction === "bulk:clear-alt-text" ? "Clearing..." : "Clear alt text"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void runBulkAction({
+                              action: "clear-taken-at-override",
+                            })
+                          }
+                          disabled={pendingAction !== null}
+                          className="admin-button-muted"
+                        >
+                          {pendingAction === "bulk:clear-taken-at-override"
+                            ? "Clearing..."
+                            : "Clear taken override"}
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  </details>
                 </div>
-              </details>
+                  </details>
 
-              <details className="muted-panel mt-4 px-4 py-4">
+                  <details className="muted-panel mt-4 px-4 py-4">
                 <summary className="cursor-pointer list-none text-sm text-white/78">
                   Bulk tags
                 </summary>
@@ -1381,50 +1380,40 @@ export function EventPhotoManager({
                   <AdminTagPicker
                     selectedTags={bulkTags}
                     onChange={setBulkTags}
-                    disabled={pendingAction !== null || pageSelectedIds.length === 0}
-                    label="Tags for selected photos"
+                    disabled={pendingAction !== null}
+                    label="Tags"
                     placeholder="Search existing tags or create a new typed tag"
                   />
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => void applyBulkTags("add-tags")}
-                      disabled={
-                        pendingAction !== null ||
-                        pageSelectedIds.length === 0 ||
-                        bulkTags.length === 0
-                      }
+                      disabled={pendingAction !== null || bulkTags.length === 0}
                       className="admin-button-muted"
                     >
-                      {pendingAction === "bulk:add-tags"
-                        ? "Saving..."
-                        : "Add selected tags"}
+                      {pendingAction === "bulk:add-tags" ? "Saving..." : "Add tags"}
                     </button>
                     <button
                       type="button"
                       onClick={() => void applyBulkTags("remove-tags")}
-                      disabled={
-                        pendingAction !== null ||
-                        pageSelectedIds.length === 0 ||
-                        bulkTags.length === 0
-                      }
+                      disabled={pendingAction !== null || bulkTags.length === 0}
                       className="admin-button-muted"
                     >
-                      {pendingAction === "bulk:remove-tags"
-                        ? "Removing..."
-                        : "Remove selected tags"}
+                      {pendingAction === "bulk:remove-tags" ? "Removing..." : "Remove tags"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setBulkTags([])}
                       disabled={pendingAction !== null || bulkTags.length === 0}
-                className="admin-button-muted"
+                      className="admin-button-muted"
                     >
-                      Clear pending tags
+                      Clear
                     </button>
                   </div>
                 </div>
-              </details>
+                  </details>
+                </>
+              ) : null}
             </div>
 
             <div className="grid gap-4 xl:grid-cols-2">

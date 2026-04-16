@@ -44,7 +44,7 @@ export default async function EditEventPage({
     <div className="space-y-8">
       <EventForm
         title={`Edit ${event.title}`}
-        description="Update metadata, change visibility, or replace the editorial cover image."
+        description="Metadata and cover."
         submitLabel="Save changes"
         action={formAction}
         initialValues={{
@@ -116,7 +116,7 @@ export default async function EditEventPage({
             <div>
               <p className="editorial-label">Uploads</p>
               <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-white">
-                Keep adding originals
+                Add more photos
               </h2>
             </div>
             <Link
@@ -126,10 +126,8 @@ export default async function EditEventPage({
               Open uploader
             </Link>
           </div>
-          <p className="text-sm leading-7 text-white/58">
-            New uploads still flow through the existing background pipeline. Finished
-            photos will show up above with processing status, metadata controls, and
-            ordering actions.
+          <p className="text-sm text-white/58">
+            New uploads will appear above after processing.
           </p>
         </aside>
 

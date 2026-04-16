@@ -86,7 +86,8 @@ body {
     background-color 180ms ease,
     border-color 180ms ease,
     color 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .viewer-control:hover:not(:disabled) {
@@ -98,6 +99,16 @@ body {
 
 .viewer-control:disabled {
   opacity: 0.35;
+}
+
+.viewer-control:focus-visible {
+  border-color: rgba(197, 150, 92, 0.72);
+  box-shadow: 0 0 0 1px rgba(197, 150, 92, 0.56);
+  outline: none;
+}
+
+.viewer-control:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .section-shell {

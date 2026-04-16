@@ -18,11 +18,10 @@ export default async function AdminOverviewPage() {
       <section className="space-y-2.5">
         <p className="editorial-label">Overview</p>
         <h1 className="font-serif text-4xl tracking-[-0.04em] text-white sm:text-[2.8rem]">
-          Local gallery control room.
+          Keep the library moving.
         </h1>
-        <p className="max-w-3xl text-sm leading-7 text-white/54 sm:text-[0.95rem]">
-          Monitor publishing state, triage imports, and move between editorial tasks
-          without losing the image-first feel of the product.
+        <p className="max-w-2xl text-sm text-white/54 sm:text-[0.95rem]">
+          Events, uploads, imports, and cleanup at a glance.
         </p>
       </section>
 
@@ -42,7 +41,7 @@ export default async function AdminOverviewPage() {
           <div>
             <p className="editorial-label">Recent Events</p>
             <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-white">
-              Latest edits and uploads
+              Recent work
             </h2>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -30,12 +30,10 @@ export function SiteProfileForm({
       <div className="space-y-2">
         <p className="editorial-label">Homepage Profile</p>
         <h2 className="font-serif text-3xl tracking-[-0.03em] text-white">
-          Public header content
+          Public header
         </h2>
-        <p className="max-w-2xl text-sm leading-7 text-white/58">
-          Update the identity block that sits above the public event grid. Direct
-          uploads are optional fallback media if you do not want to reuse a processed
-          gallery image.
+        <p className="max-w-2xl text-sm text-white/58">
+          Direct uploads are optional.
         </p>
       </div>
 
@@ -91,7 +89,7 @@ export function SiteProfileForm({
             name="bio"
             defaultValue={initialValues.bio}
             className="admin-textarea"
-            placeholder="Short profile copy for the public homepage."
+            placeholder="Optional longer bio"
           />
         </label>
 
