@@ -16,7 +16,7 @@ type PhotoGridProps = {
 
 export function PhotoGrid({ photos, returnHref }: PhotoGridProps) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8">
+    <div className="columns-2 gap-2 sm:columns-3 sm:gap-2.5 md:columns-3 lg:columns-4 xl:columns-6 2xl:columns-7">
       {photos.map((photo) => {
         const href = returnHref
           ? {
@@ -27,12 +27,18 @@ export function PhotoGrid({ photos, returnHref }: PhotoGridProps) {
             }
           : `/p/${photo.id}`;
 
+        const ratio =
+          photo.gridWidth > 0 && photo.gridHeight > 0
+            ? `${photo.gridWidth} / ${photo.gridHeight}`
+            : "4 / 5";
+
         return (
           <Link
             key={photo.id}
             href={href}
             scroll={false}
-            className="group relative aspect-[4/5] overflow-hidden rounded-[1.05rem] border border-white/8 bg-white/4 shadow-[0_16px_42px_rgba(0,0,0,0.18)] transition duration-300 hover:-translate-y-0.5 hover:border-white/14 hover:shadow-[0_22px_60px_rgba(0,0,0,0.24)]"
+            style={{ aspectRatio: ratio }}
+            className="group relative mb-2 block break-inside-avoid overflow-hidden rounded-[1.05rem] border border-white/8 bg-white/4 shadow-[0_16px_42px_rgba(0,0,0,0.18)] transition duration-300 hover:-translate-y-0.5 hover:border-white/14 hover:shadow-[0_22px_60px_rgba(0,0,0,0.24)] sm:mb-2.5"
           >
             <div className="relative h-full w-full overflow-hidden bg-[#0c0c0c]">
               {photo.gridImageUrl ? (
