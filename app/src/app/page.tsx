@@ -14,7 +14,7 @@ export default async function Home() {
 
         <section>
           {events.length ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-5">
+            <div className="grid justify-center gap-4 xl:gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(18rem,100%),22rem))]">
               {events.map((event) => (
                 <EventCard key={event.id} event={event} />
               ))}

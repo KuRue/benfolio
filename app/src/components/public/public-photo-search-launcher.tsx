@@ -72,7 +72,7 @@ export function PublicPhotoSearchLauncher({
 
   const resultCountLabel = useMemo(() => {
     if (!deferredQuery.trim()) {
-      return "Search by character, event, year, species, maker, or general tag.";
+      return null;
     }
 
     if (loading) {
@@ -286,17 +286,15 @@ export function PublicPhotoSearchLauncher({
                 </button>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[0.68rem] uppercase tracking-[0.26em] text-white/42">
-                <p>{resultCountLabel}</p>
+                <p>{resultCountLabel ?? ""}</p>
                 <p className="hidden text-white/34 sm:block">/ or Ctrl+K to open · Esc to dismiss</p>
               </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
               {!query.trim() ? (
-                <div className="muted-panel flex h-full min-h-56 items-center justify-center px-6 text-center text-sm leading-7 text-white/54">
-                  Search narrows live across public photos using typed tags, event titles,
-                  and year-like terms. Results stay photo-first and keep hidden content
-                  out of the public index.
+                <div className="flex h-full min-h-56 items-center justify-center text-white/22">
+                  <Search size={56} strokeWidth={1} />
                 </div>
               ) : results.length ? (
                 <div className="space-y-3">
@@ -309,7 +307,7 @@ export function PublicPhotoSearchLauncher({
                         type="button"
                         onMouseEnter={() => setActiveIndex(index)}
                         onClick={() => navigateToResult(result.href)}
-                        className={`grid w-full gap-4 rounded-[1.45rem] border px-3 py-3 text-left transition sm:grid-cols-[5.25rem_minmax(0,1fr)] sm:px-4 ${
+                        className={`grid w-full gap-4 rounded-[1.45rem] border px-3 py-3 text-left transition sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-5 sm:px-4 ${
                           isActive
                             ? "border-white/18 bg-white/8 shadow-[0_18px_50px_rgba(0,0,0,0.2)]"
                             : "border-white/8 bg-white/[0.03] hover:border-white/12 hover:bg-white/[0.06]"
@@ -324,7 +322,7 @@ export function PublicPhotoSearchLauncher({
                           {result.previewUrl ? (
                             <img
                               src={result.previewUrl}
-                              alt={result.altText ?? result.title}
+                              alt={result.altText ?? result.event.title}
                               className="h-full w-full object-cover"
                             />
                           ) : (
@@ -336,10 +334,10 @@ export function PublicPhotoSearchLauncher({
                         <div className="min-w-0 space-y-2">
                           <div className="space-y-1">
                             <p className="line-clamp-1 font-serif text-2xl tracking-[-0.03em] text-white sm:text-[1.75rem]">
-                              {result.title}
+                              {result.event.title}
                             </p>
                             <p className="text-[0.68rem] uppercase tracking-[0.28em] text-white/42">
-                              {result.event.title} · {result.event.eventDateLabel}
+                              {result.event.eventDateLabel}
                               {result.effectiveTakenAtLabel
                                 ? ` · captured ${result.effectiveTakenAtLabel}`
                                 : ""}
