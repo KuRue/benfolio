@@ -211,16 +211,18 @@ export function PhotoViewerClient({
 
   function handleClose() {
     startTransition(() => {
-      if (closeHref) {
-        router.replace(closeHref, { scroll: false });
+      // In modal mode (intercepted @modal/(.)p/[id] route), router.back() is the only
+      // thing that actually unmounts the parallel slot. router.replace updates the URL
+      // but leaves the modal painted. Fall through to closeHref/eventHref only when
+      // there's no history to pop (deep link / refreshed modal).
+      if (isModal && window.history.length > 1) {
+        router.back();
         return;
       }
 
-      if (isModal) {
-        if (window.history.length > 1) {
-          router.back();
-          return;
-        }
+      if (closeHref) {
+        router.replace(closeHref, { scroll: false });
+        return;
       }
 
       router.push(eventHref, { scroll: false });
@@ -270,7 +272,7 @@ export function PhotoViewerClient({
 
     controlsTimeoutRef.current = window.setTimeout(() => {
       setControlsVisible(false);
-    }, touchLayout ? 2200 : 1400);
+    }, touchLayout ? 5000 : 4000);
 
     return () => {
       clearControlsTimeout();
