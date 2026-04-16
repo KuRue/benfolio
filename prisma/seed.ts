@@ -2,7 +2,7 @@ import { randomBytes, scryptSync } from "node:crypto";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 
-import { PrismaClient } from "./generated/client";
+import { PrismaClient } from "./generated/client/client";
 
 const adapter = new PrismaPg({
   connectionString:
