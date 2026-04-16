@@ -1,5 +1,16 @@
 import { z } from "zod";
 
+function emptyStringAsUndefined<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+  }, schema);
+}
+
 const envSchema = z.object({
   DATABASE_URL: z
     .string()
@@ -7,7 +18,7 @@ const envSchema = z.object({
     .default("postgresql://gallery:gallery@localhost:5432/gallery?schema=public"),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
   S3_ENDPOINT: z.string().url(),
-  S3_REGION: z.string().default("auto"),
+  S3_REGION: emptyStringAsUndefined(z.string().default("auto")),
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
   S3_FORCE_PATH_STYLE: z
@@ -15,9 +26,13 @@ const envSchema = z.object({
     .transform((value) => value === true || value === "true"),
   S3_BUCKET_ORIGINALS: z.string().min(1),
   S3_BUCKET_DERIVATIVES: z.string().min(1),
-  IMPORTS_PREFIX: z.string().min(1).default("imports/"),
-  IMPORTS_CLEANUP_MODE: z.enum(["delete", "archive"]).default("delete"),
-  IMPORTS_ARCHIVE_PREFIX: z.string().min(1).default("processed-imports/"),
+  IMPORTS_PREFIX: emptyStringAsUndefined(z.string().min(1).default("imports/")),
+  IMPORTS_CLEANUP_MODE: emptyStringAsUndefined(
+    z.enum(["delete", "archive"]).default("delete"),
+  ),
+  IMPORTS_ARCHIVE_PREFIX: emptyStringAsUndefined(
+    z.string().min(1).default("processed-imports/"),
+  ),
 });
 
 export const env = envSchema.parse({

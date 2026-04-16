@@ -55,8 +55,10 @@ services:
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done &&
+      printf '%s' '[{\"AllowedOrigins\":[\"http://localhost:3000\",\"http://127.0.0.1:3000\"],\"AllowedMethods\":[\"PUT\",\"GET\",\"HEAD\"],\"AllowedHeaders\":[\"*\"],\"ExposeHeaders\":[\"ETag\",\"x-amz-request-id\",\"x-amz-id-2\"],\"MaxAgeSeconds\":3600}]' >/tmp/gallery-cors.json &&
       mc mb --ignore-existing local/gallery-originals &&
       mc mb --ignore-existing local/gallery-derivatives &&
+      mc cors set local/gallery-originals /tmp/gallery-cors.json &&
       mc anonymous set download local/gallery-derivatives
       "
 
@@ -78,6 +80,7 @@ services:
       REDIS_URL: redis://redis:6379
       AUTH_COOKIE_SECRET: local-development-secret-change-me
       S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
       S3_REGION: auto
       S3_ACCESS_KEY_ID: minioadmin
       S3_SECRET_ACCESS_KEY: minioadmin

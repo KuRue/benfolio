@@ -33,7 +33,6 @@ type PhotoViewerClientProps = {
   alt: string;
   title: string;
   subtitle: string;
-  eventTitle: string;
   eventHref: string;
   downloadHref: string;
   previousHref: string | null;
@@ -63,14 +62,12 @@ function viewerActionClass(active = false) {
 function DetailsPanel({
   title,
   subtitle,
-  eventTitle,
   eventHref,
   infoRows,
   tagGroups,
 }: {
   title: string;
   subtitle: string;
-  eventTitle: string;
   eventHref: string;
   infoRows: ViewerInfoRow[];
   tagGroups: ViewerTagGroup[];
@@ -82,7 +79,7 @@ function DetailsPanel({
           href={eventHref}
           className="text-[0.68rem] uppercase tracking-[0.3em] text-white/42 transition hover:text-white/74"
         >
-          {eventTitle}
+          Open event
         </a>
         <div className="space-y-2">
           <h1 className="font-serif text-[1.8rem] leading-none tracking-[-0.04em] text-white sm:text-[2rem]">
@@ -145,7 +142,6 @@ export function PhotoViewerClient({
   alt,
   title,
   subtitle,
-  eventTitle,
   eventHref,
   downloadHref,
   previousHref,
@@ -159,7 +155,9 @@ export function PhotoViewerClient({
   const [shareState, setShareState] = useState<"idle" | "copied" | "shared">("idle");
   const [infoOpen, setInfoOpen] = useState(false);
   const [touchLayout, setTouchLayout] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
   const touchStartX = useRef<number | null>(null);
+  const controlsTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1023px), (pointer: coarse)");
@@ -199,21 +197,33 @@ export function PhotoViewerClient({
     });
   }
 
+  function clearControlsTimeout() {
+    if (controlsTimeoutRef.current) {
+      window.clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
+    }
+  }
+
+  function revealControls() {
+    clearControlsTimeout();
+    setControlsVisible(true);
+  }
+
   function handleClose() {
     startTransition(() => {
-      if (isModal) {
-        if (closeHref) {
-          router.replace(closeHref, { scroll: false });
-          return;
-        }
+      if (closeHref) {
+        router.replace(closeHref, { scroll: false });
+        return;
+      }
 
+      if (isModal) {
         if (window.history.length > 1) {
           router.back();
           return;
         }
       }
 
-      router.push(closeHref ?? eventHref, { scroll: false });
+      router.push(eventHref, { scroll: false });
     });
   }
 
@@ -249,6 +259,24 @@ export function PhotoViewerClient({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    clearControlsTimeout();
+
+    if (!controlsVisible || infoOpen) {
+      return () => {
+        clearControlsTimeout();
+      };
+    }
+
+    controlsTimeoutRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+    }, touchLayout ? 2200 : 1400);
+
+    return () => {
+      clearControlsTimeout();
+    };
+  }, [controlsVisible, touchLayout, infoOpen, imageUrl, previousHref, nextHref]);
+
   async function handleShare() {
     if (typeof navigator === "undefined") {
       return;
@@ -283,11 +311,12 @@ export function PhotoViewerClient({
     <div
       className={
         isModal
-          ? "fixed inset-0 z-50 bg-[rgba(3,3,3,0.82)] backdrop-blur-xl"
-          : "min-h-screen bg-[#050505]"
+          ? "fixed inset-0 z-50 h-[100dvh] overflow-hidden bg-[rgba(3,3,3,0.82)] backdrop-blur-xl"
+          : "h-[100dvh] overflow-hidden bg-[#050505]"
       }
       onTouchStart={(event) => {
         touchStartX.current = event.changedTouches[0]?.clientX ?? null;
+        revealControls();
       }}
       onTouchEnd={(event) => {
         if (infoOpen || !touchLayout) {
@@ -313,46 +342,14 @@ export function PhotoViewerClient({
           navigate(nextHref);
         }
       }}
+      onMouseMove={() => {
+        if (!touchLayout) {
+          revealControls();
+        }
+      }}
     >
-      <div className="relative flex min-h-screen w-full overflow-hidden">
+      <div className="relative flex h-[100dvh] w-full overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.04),_transparent_30%),radial-gradient(circle_at_center,_rgba(197,150,92,0.07),_transparent_62%)]" />
-
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-30 flex justify-end px-3 pt-3 sm:px-4 sm:pt-4">
-          <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-black/42 px-1.5 py-1.5 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.34)]">
-            <button
-              type="button"
-              onClick={handleClose}
-              className={viewerActionClass()}
-              aria-label={isModal ? "Close viewer" : "Back to event"}
-            >
-              {isModal ? <X size={18} /> : <ArrowLeft size={18} />}
-            </button>
-            <button
-              type="button"
-              onClick={() => setInfoOpen((current) => !current)}
-              className={viewerActionClass(infoOpen)}
-              aria-label={touchLayout ? "Toggle details sheet" : "Toggle details panel"}
-              aria-pressed={infoOpen}
-            >
-              <Info size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={handleShare}
-              className={viewerActionClass(shareState !== "idle")}
-              aria-label="Share photo"
-            >
-              <Link2 size={18} />
-            </button>
-            <a
-              href={downloadHref}
-              className={viewerActionClass()}
-              aria-label="Download original"
-            >
-              <Download size={18} />
-            </a>
-          </div>
-        </div>
 
         {shareState !== "idle" ? (
           <div className="pointer-events-none fixed inset-x-0 top-16 z-30 flex justify-center px-3 sm:top-[4.75rem]">
@@ -362,42 +359,90 @@ export function PhotoViewerClient({
           </div>
         ) : null}
 
-        {!touchLayout ? (
-          <>
-            <button
-              type="button"
-              onClick={() => navigate(previousHref)}
-              disabled={!previousHref}
-              className="glass-panel viewer-control fixed left-4 top-1/2 z-30 hidden -translate-y-1/2 lg:inline-flex"
-              aria-label="Previous photo"
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(nextHref)}
-              disabled={!nextHref}
-              className="glass-panel viewer-control fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 lg:inline-flex"
-              aria-label="Next photo"
-            >
-              <ArrowRight size={18} />
-            </button>
-          </>
-        ) : null}
-
         <div
-          className={`relative z-10 flex min-h-screen flex-1 items-center justify-center px-2 pb-3 pt-[4.5rem] sm:px-4 sm:pb-4 sm:pt-[5.5rem] lg:px-6 lg:pb-6 lg:pt-6 ${
+          className={`relative z-10 flex h-[100dvh] flex-1 items-center justify-center overflow-hidden px-2 py-2 sm:px-4 sm:py-4 lg:px-6 lg:py-6 ${
             !touchLayout && infoOpen ? "lg:pr-[27rem] xl:pr-[29rem]" : ""
           }`}
+          onClick={() => {
+            if (touchLayout) {
+              revealControls();
+            }
+          }}
         >
+          <div
+            className={`pointer-events-none absolute inset-0 z-20 transition-opacity duration-300 ${
+              controlsVisible || infoOpen ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <div className="absolute inset-x-0 top-0 flex justify-end px-3 pt-3 sm:px-4 sm:pt-4">
+              <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-black/42 px-1.5 py-1.5 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.34)]">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className={viewerActionClass()}
+                  aria-label={isModal ? "Close viewer" : "Back to event"}
+                >
+                  {isModal ? <X size={18} /> : <ArrowLeft size={18} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInfoOpen((current) => !current)}
+                  className={viewerActionClass(infoOpen)}
+                  aria-label={touchLayout ? "Toggle details sheet" : "Toggle details panel"}
+                  aria-pressed={infoOpen}
+                >
+                  <Info size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className={viewerActionClass(shareState !== "idle")}
+                  aria-label="Share photo"
+                >
+                  <Link2 size={18} />
+                </button>
+                <a
+                  href={downloadHref}
+                  className={viewerActionClass()}
+                  aria-label="Download original"
+                >
+                  <Download size={18} />
+                </a>
+              </div>
+            </div>
+
+            {!touchLayout ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate(previousHref)}
+                  disabled={!previousHref}
+                  className="glass-panel viewer-control pointer-events-auto absolute left-4 top-1/2 hidden -translate-y-1/2 lg:inline-flex"
+                  aria-label="Previous photo"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(nextHref)}
+                  disabled={!nextHref}
+                  className="glass-panel viewer-control pointer-events-auto absolute right-4 top-1/2 hidden -translate-y-1/2 lg:inline-flex"
+                  aria-label="Next photo"
+                >
+                  <ArrowRight size={18} />
+                </button>
+              </>
+            ) : null}
+          </div>
+
           {imageUrl ? (
-            <div className="relative flex max-h-[calc(100vh-1.25rem)] max-w-[calc(100vw-1rem)] items-center justify-center rounded-[1.5rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1.5 shadow-[0_36px_120px_rgba(0,0,0,0.42)] sm:max-h-[calc(100vh-2rem)] sm:max-w-[calc(100vw-2rem)] lg:p-2">
+            <div className="relative flex max-h-[calc(100dvh-0.5rem)] max-w-[calc(100vw-0.5rem)] items-center justify-center rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] sm:max-h-[calc(100dvh-1rem)] sm:max-w-[calc(100vw-1rem)] lg:p-1.5">
               <img
                 src={imageUrl}
                 width={imageWidth}
                 height={imageHeight}
                 alt={alt}
-                className="max-h-[calc(100vh-2.1rem)] w-auto max-w-[calc(100vw-1.4rem)] rounded-[1.1rem] object-contain shadow-[0_24px_90px_rgba(0,0,0,0.36)] sm:max-h-[calc(100vh-3rem)] sm:max-w-[calc(100vw-3rem)] lg:max-h-[calc(100vh-3.2rem)]"
+                className="max-h-[calc(100dvh-0.7rem)] w-auto max-w-[calc(100vw-0.7rem)] rounded-[1.05rem] object-contain shadow-[0_24px_90px_rgba(0,0,0,0.36)] sm:max-h-[calc(100dvh-1.2rem)] sm:max-w-[calc(100vw-1.2rem)] lg:max-h-[calc(100dvh-0.9rem)]"
               />
             </div>
           ) : (
@@ -424,7 +469,6 @@ export function PhotoViewerClient({
                 <DetailsPanel
                   title={title}
                   subtitle={subtitle}
-                  eventTitle={eventTitle}
                   eventHref={eventHref}
                   infoRows={infoRows}
                   tagGroups={tagGroups}
@@ -450,7 +494,6 @@ export function PhotoViewerClient({
                 <DetailsPanel
                   title={title}
                   subtitle={subtitle}
-                  eventTitle={eventTitle}
                   eventHref={eventHref}
                   infoRows={infoRows}
                   tagGroups={tagGroups}

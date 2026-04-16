@@ -103,13 +103,13 @@ export function PhotoViewerShell({
 
   return (
     <PhotoViewerClient
+      key={viewer.id}
       imageUrl={viewer.imageUrl}
       imageWidth={viewer.imageWidth}
       imageHeight={viewer.imageHeight}
       alt={viewer.altText ?? heading}
       title={heading}
       subtitle={subtitle ?? ""}
-      eventTitle={viewer.event.title}
       eventHref={viewer.eventHref}
       downloadHref={`/download/${viewer.id}`}
       previousHref={withReturnHref(viewer.previousHref, normalizedReturnHref)}

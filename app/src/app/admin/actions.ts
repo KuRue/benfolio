@@ -57,6 +57,30 @@ function normalizeHandle(value: string) {
   return normalized || null;
 }
 
+function normalizeOptionalUrl(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const candidate = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const url = new URL(candidate);
+
+    if (!["http:", "https:"].includes(url.protocol)) {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function normalizePercent(value: FormDataEntryValue | null, fallback = 50) {
   if (typeof value !== "string" || !value.trim()) {
     return fallback;
@@ -256,6 +280,7 @@ export async function updateSiteProfileAction(
 
   const displayName = asString(formData.get("displayName"));
   const handle = normalizeHandle(asString(formData.get("handle")));
+  const linkUrlInput = asString(formData.get("linkUrl"));
   const headline =
     asString(formData.get("headline")) ||
     "Event photography arranged with the feel of the original night.";
@@ -264,6 +289,13 @@ export async function updateSiteProfileAction(
     "A mobile-first archive for event coverage, client galleries, and private releases.";
   const coverFocalX = normalizePercent(formData.get("coverFocalX"));
   const coverFocalY = normalizePercent(formData.get("coverFocalY"));
+  const websiteUrl = normalizeOptionalUrl(linkUrlInput);
+
+  if (linkUrlInput && !websiteUrl) {
+    return {
+      error: "Link must be a valid http(s) URL.",
+    };
+  }
 
   if (!displayName) {
     return {
@@ -281,6 +313,8 @@ export async function updateSiteProfileAction(
       handle,
       headline,
       bio,
+      websiteUrl,
+      instagramUrl: null,
       coverFocalX,
       coverFocalY,
     },
@@ -290,6 +324,8 @@ export async function updateSiteProfileAction(
       handle,
       headline,
       bio,
+      websiteUrl,
+      instagramUrl: null,
       coverFocalX,
       coverFocalY,
     },
@@ -297,6 +333,7 @@ export async function updateSiteProfileAction(
 
   const heroFile = formData.get("heroImage");
   const avatarFile = formData.get("avatarImage");
+  const logoFile = formData.get("logoImage");
 
   if (heroFile instanceof File && heroFile.size > 0) {
     await storeSiteProfileImage("cover", heroFile);
@@ -304,6 +341,10 @@ export async function updateSiteProfileAction(
 
   if (avatarFile instanceof File && avatarFile.size > 0) {
     await storeSiteProfileImage("avatar", avatarFile);
+  }
+
+  if (logoFile instanceof File && logoFile.size > 0) {
+    await storeSiteProfileImage("logo", logoFile);
   }
 
   revalidatePath("/");

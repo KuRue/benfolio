@@ -16,6 +16,8 @@ const defaultSiteProfile = {
   instagramUrl: null,
   avatarOriginalKey: null,
   avatarDisplayKey: null,
+  logoOriginalKey: null,
+  logoDisplayKey: null,
   coverOriginalKey: null,
   coverDisplayKey: null,
   coverFocalX: 50,

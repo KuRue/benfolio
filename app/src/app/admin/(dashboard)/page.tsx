@@ -14,11 +14,11 @@ export default async function AdminOverviewPage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1.5">
           <p className="editorial-label">Overview</p>
-          <h1 className="font-serif text-3xl tracking-[-0.04em] text-white sm:text-[2.45rem]">
+          <h1 className="font-serif text-[2rem] tracking-[-0.04em] text-white sm:text-[2.2rem]">
             Library
           </h1>
         </div>
@@ -36,17 +36,17 @@ export default async function AdminOverviewPage() {
         </div>
       </section>
 
-      <section className="admin-card px-4 py-4 sm:px-5 sm:py-5">
+      <section className="admin-card px-4 py-3 sm:px-5 sm:py-4">
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           {cards.map((card) => (
             <div
               key={card.label}
-              className="rounded-[1.1rem] border border-white/8 bg-white/[0.03] px-3 py-3"
+              className="rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-2.5"
             >
-              <p className="text-[0.72rem] uppercase tracking-[0.24em] text-white/42">
+              <p className="text-[0.68rem] uppercase tracking-[0.22em] text-white/40">
                 {card.label}
               </p>
-              <p className="mt-2 font-serif text-[1.9rem] leading-none tracking-[-0.04em] text-white">
+              <p className="mt-1.5 font-serif text-[1.6rem] leading-none tracking-[-0.04em] text-white">
                 {card.value}
               </p>
             </div>
@@ -58,7 +58,7 @@ export default async function AdminOverviewPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1.5">
             <p className="editorial-label">Recent Events</p>
-            <h2 className="font-serif text-[2rem] tracking-[-0.03em] text-white">
+            <h2 className="font-serif text-[1.85rem] tracking-[-0.03em] text-white">
               Events
             </h2>
           </div>
@@ -72,7 +72,7 @@ export default async function AdminOverviewPage() {
           </div>
         </div>
 
-        <div className="grid gap-3">
+        <div className="grid gap-2.5">
           {dashboard.recentEvents.map((event) => (
             <Link
               key={event.id}

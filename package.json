@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate dev --config ./prisma.config.ts",
     "db:deploy": "prisma migrate deploy --config ./prisma.config.ts",
     "db:seed": "prisma db seed --config ./prisma.config.ts",
+    "deploy:init": "npm run db:generate && npm run db:deploy && npm run db:seed",
     "db:studio": "prisma studio --config ./prisma.config.ts",
     "postinstall": "npm run db:generate"
   },

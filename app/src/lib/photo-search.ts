@@ -39,6 +39,11 @@ type SearchCandidate = {
       name: string;
       slug: string;
       category: TagCategoryValue;
+      aliases: Array<{
+        id: string;
+        name: string;
+        slug: string;
+      }>;
     };
   }>;
 };
@@ -202,6 +207,26 @@ function buildPublicPhotoSearchWhere(terms: string[]) {
                     mode: "insensitive",
                   },
                 },
+                {
+                  aliases: {
+                    some: {
+                      OR: [
+                        {
+                          name: {
+                            contains: term,
+                            mode: "insensitive",
+                          },
+                        },
+                        {
+                          slug: {
+                            contains: term,
+                            mode: "insensitive",
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
               ],
             },
           },
@@ -250,7 +275,13 @@ function getMatchedTags(candidate: SearchCandidate, terms: string[]) {
         (term) =>
           tag.slug.toLowerCase() === term ||
           includesNormalized(tag.slug, term) ||
-          includesNormalized(tag.name, term),
+          includesNormalized(tag.name, term) ||
+          tag.aliases.some(
+            (alias) =>
+              alias.slug.toLowerCase() === term ||
+              includesNormalized(alias.slug, term) ||
+              includesNormalized(alias.name, term),
+          ),
       ),
     )
     .slice(0, 4);
@@ -387,7 +418,13 @@ export async function searchPublicPhotos(args: { query: string; limit?: number }
       },
       tags: {
         include: {
-          tag: true,
+          tag: {
+            include: {
+              aliases: {
+                orderBy: [{ name: "asc" }],
+              },
+            },
+          },
         },
       },
     },

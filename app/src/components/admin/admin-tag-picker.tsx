@@ -8,6 +8,7 @@ import {
   getTagCategoryLabel,
   normalizeTagDraft,
   normalizeTagName,
+  normalizeTagSlug,
   tagCategoryOptions,
   type TagCategoryValue,
   type TagDraft,
@@ -27,6 +28,12 @@ type TagSuggestion = {
   slug: string;
   category: TagCategoryValue;
   photoCount: number;
+  aliasCount: number;
+  matchedAliases?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
 };
 
 function toTagKey(tag: TagDraft) {
@@ -131,12 +138,21 @@ export function AdminTagPicker({
   }
 
   const normalizedQuery = normalizeTagName(query);
+  const normalizedSlug = normalizeTagSlug(query);
   const hasExactSuggestion = suggestions.some(
     (suggestion) =>
       suggestion.category === category &&
-      suggestion.name.localeCompare(normalizedQuery, undefined, {
+      (suggestion.name.localeCompare(normalizedQuery, undefined, {
         sensitivity: "accent",
-      }) === 0,
+      }) === 0 ||
+        suggestion.slug === normalizedSlug ||
+        suggestion.matchedAliases?.some(
+          (alias) =>
+            alias.slug === normalizedSlug ||
+            alias.name.localeCompare(normalizedQuery, undefined, {
+              sensitivity: "accent",
+            }) === 0,
+        )),
   );
 
   return (
@@ -229,7 +245,16 @@ export function AdminTagPicker({
                           <span className="block">{suggestion.name}</span>
                           <span className="block text-[0.68rem] uppercase tracking-[0.24em] text-white/38">
                             {getTagCategoryLabel(suggestion.category)} · {suggestion.photoCount} photos
+                            {suggestion.aliasCount ? ` · ${suggestion.aliasCount} aliases` : ""}
                           </span>
+                          {suggestion.matchedAliases?.length ? (
+                            <span className="mt-1 block text-xs text-white/46">
+                              Alias match:{" "}
+                              {suggestion.matchedAliases
+                                .map((alias) => alias.name)
+                                .join(", ")}
+                            </span>
+                          ) : null}
                         </span>
                         {selected ? (
                           <span className="text-xs uppercase tracking-[0.22em] text-white/34">

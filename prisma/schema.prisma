@@ -104,6 +104,8 @@ model SiteProfile {
   instagramUrl      String?
   avatarOriginalKey String?
   avatarDisplayKey  String?
+  logoOriginalKey   String?
+  logoDisplayKey    String?
   coverOriginalKey  String?
   coverDisplayKey   String?
   coverFocalX       Int?

@@ -1,0 +1,26 @@
+services:
+  init:
+    image: node:24-bookworm
+    working_dir: /workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${SERVER_DATABASE_URL:-postgresql://gallery:change-me@db:5432/gallery?schema=public}
+    volumes:
+      - .:/workspace
+      - server-init-root-node-modules:/workspace/node_modules
+      - server-init-app-node-modules:/workspace/app/node_modules
+      - server-init-worker-node-modules:/workspace/worker/node_modules
+    command: >
+      /bin/sh -c "
+      npm ci &&
+      npm run deploy:init
+      "
+
+volumes:
+  server-init-root-node-modules:
+  server-init-app-node-modules:
+  server-init-worker-node-modules:

@@ -401,56 +401,44 @@ export function ImportsPanel({
   ];
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <p className="editorial-label">Imports</p>
-        <h1 className="font-serif text-4xl tracking-[-0.03em] text-white">
-          Storage-prefix ingestion
-        </h1>
-        <p className="max-w-3xl text-sm leading-7 text-white/58">
-          Webhooks can now queue targeted objects under
-          <span className="text-white/78"> imports/&lt;event-slug&gt;/...</span>, while
-          manual scans remain the fallback. Each imported object keeps its own status,
-          cleanup outcome, and retry controls.
-        </p>
+    <div className="space-y-6">
+      <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1.5">
+          <p className="editorial-label">Imports</p>
+          <h1 className="font-serif text-3xl tracking-[-0.03em] text-white sm:text-[2.45rem]">
+            Imports
+          </h1>
+        </div>
+        <button
+          type="button"
+          onClick={() => void runScan()}
+          disabled={pendingAction !== null}
+          className="admin-button"
+        >
+          {pendingAction === "scan" ? "Scanning..." : "Scan imports"}
+        </button>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {summaryCards.map((card) => (
-          <div key={card.label} className="admin-card px-5 py-6">
-            <p className="text-sm text-white/54">{card.label}</p>
-            <p className="mt-3 font-serif text-4xl text-white">{card.value}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="admin-card space-y-5 px-6 py-6">
+      <section className="admin-card space-y-4 px-5 py-5 sm:px-6 sm:py-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-2">
-            <p className="editorial-label">Operations</p>
-            <h2 className="font-serif text-3xl tracking-[-0.03em] text-white">
-              Scan fallback and webhook trust
-            </h2>
-            <p className="max-w-3xl text-sm leading-7 text-white/58">
-              Manual scans still discover anything left under the imports prefix. Webhook
-              duplicates are recorded as skipped items instead of creating extra photos.
-            </p>
+          <p className="editorial-label">Status</p>
+          <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.22em] text-white/44">
+            <span>{jobStatusSummary.PENDING ?? 0} jobs pending</span>
+            <span>{jobStatusSummary.RUNNING ?? 0} running</span>
+            <span>{jobStatusSummary.SUCCEEDED ?? 0} complete</span>
+            <span>{jobStatusSummary.FAILED ?? 0} failed</span>
           </div>
-          <button
-            type="button"
-            onClick={() => void runScan()}
-            disabled={pendingAction !== null}
-            className="rounded-full bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
-          >
-            {pendingAction === "scan" ? "Scanning..." : "Scan imports prefix"}
-          </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.22em] text-white/44">
-          <span>{jobStatusSummary.PENDING ?? 0} jobs pending</span>
-          <span>{jobStatusSummary.RUNNING ?? 0} running</span>
-          <span>{jobStatusSummary.SUCCEEDED ?? 0} complete</span>
-          <span>{jobStatusSummary.FAILED ?? 0} failed</span>
+        <div className="flex flex-wrap gap-2">
+          {summaryCards.map((card) => (
+            <span
+              key={card.label}
+              className="rounded-full border border-white/10 bg-white/4 px-3 py-1.5 text-xs uppercase tracking-[0.24em] text-white/68"
+            >
+              {card.label} {card.value}
+            </span>
+          ))}
         </div>
 
         {notice ? (
@@ -466,11 +454,11 @@ export function ImportsPanel({
         ) : null}
       </section>
 
-      <section className="admin-card space-y-5 px-6 py-6">
-        <div className="space-y-2">
-          <p className="editorial-label">Filter</p>
-          <h2 className="font-serif text-3xl tracking-[-0.03em] text-white">
-            Find import items
+      <section className="admin-card space-y-4 px-5 py-5 sm:px-6 sm:py-6">
+        <div className="space-y-1.5">
+          <p className="editorial-label">Filters</p>
+          <h2 className="font-serif text-[1.85rem] tracking-[-0.03em] text-white">
+            Filter imports
           </h2>
         </div>
 
@@ -484,12 +472,12 @@ export function ImportsPanel({
             name="q"
             defaultValue={filters.query}
             placeholder="Search by event slug or object key"
-            className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/34"
+            className="admin-input"
           />
           <select
             name="status"
             defaultValue={filters.status}
-            className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none"
+            className="admin-select"
           >
             <option value="ALL">All statuses</option>
             <option value="PENDING">Pending</option>
@@ -501,7 +489,7 @@ export function ImportsPanel({
           <select
             name="visibility"
             defaultValue={filters.visibility}
-            className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none"
+            className="admin-select"
           >
             <option value="ACTIVE">Active queue</option>
             <option value="ALL">Include dismissed</option>
@@ -532,15 +520,11 @@ export function ImportsPanel({
                 `Retry ${bulkActionSummary.retryFailed} failed import items in the current filter?`,
               )
             }
-            className="rounded-3xl border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
+            className="rounded-[1.3rem] border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
           >
-            <span className="editorial-label">Bulk Retry</span>
-            <span className="mt-2 block text-white">
-              Retry failed items
-            </span>
-            <span className="mt-2 block text-white/52">
-              {bulkActionSummary.retryFailed} eligible in this filter
-            </span>
+            <span className="editorial-label">Retry</span>
+            <span className="mt-2 block text-white">Retry failed items</span>
+            <span className="mt-2 block text-white/52">{bulkActionSummary.retryFailed} visible</span>
           </button>
           <button
             type="button"
@@ -553,15 +537,11 @@ export function ImportsPanel({
                 `Retry cleanup for ${bulkActionSummary.retryCleanupFailed} failed import items in the current filter?`,
               )
             }
-            className="rounded-3xl border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
+            className="rounded-[1.3rem] border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
           >
-            <span className="editorial-label">Cleanup Retry</span>
-            <span className="mt-2 block text-white">
-              Retry cleanup failures
-            </span>
-            <span className="mt-2 block text-white/52">
-              {bulkActionSummary.retryCleanupFailed} cleanup failures visible
-            </span>
+            <span className="editorial-label">Cleanup</span>
+            <span className="mt-2 block text-white">Retry cleanup failures</span>
+            <span className="mt-2 block text-white/52">{bulkActionSummary.retryCleanupFailed} visible</span>
           </button>
           <button
             type="button"
@@ -572,15 +552,11 @@ export function ImportsPanel({
                 `Dismiss ${bulkActionSummary.dismissTerminal} completed or skipped items from the active queue? Failed items will remain visible.`,
               )
             }
-            className="rounded-3xl border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
+            className="rounded-[1.3rem] border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
           >
-            <span className="editorial-label">Queue Hygiene</span>
-            <span className="mt-2 block text-white">
-              Dismiss completed and skipped
-            </span>
-            <span className="mt-2 block text-white/52">
-              {bulkActionSummary.dismissTerminal} items can leave the active queue
-            </span>
+            <span className="editorial-label">Dismiss</span>
+            <span className="mt-2 block text-white">Dismiss complete and skipped</span>
+            <span className="mt-2 block text-white/52">{bulkActionSummary.dismissTerminal} visible</span>
           </button>
         </div>
       </section>
@@ -588,8 +564,8 @@ export function ImportsPanel({
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="editorial-label">Recent Jobs</p>
-            <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-white">
+            <p className="editorial-label">Jobs</p>
+            <h2 className="mt-2 font-serif text-[1.85rem] tracking-[-0.03em] text-white">
               Job history
             </h2>
           </div>
@@ -723,9 +699,9 @@ export function ImportsPanel({
 
       <section className="space-y-4">
         <div>
-          <p className="editorial-label">Per-file Items</p>
-          <h2 className="mt-2 font-serif text-3xl tracking-[-0.03em] text-white">
-            Object-level state
+          <p className="editorial-label">Items</p>
+          <h2 className="mt-2 font-serif text-[1.85rem] tracking-[-0.03em] text-white">
+            Files
           </h2>
         </div>
 

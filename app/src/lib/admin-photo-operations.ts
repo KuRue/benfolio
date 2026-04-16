@@ -14,7 +14,7 @@ import {
   uploadObject,
 } from "@/lib/storage";
 
-type ProfileImageSlot = "cover" | "avatar";
+type ProfileImageSlot = "cover" | "avatar" | "logo";
 type ReprocessableState = "READY" | "FAILED";
 type BulkMetadataField = "caption" | "altText" | "takenAtOverride";
 
@@ -54,15 +54,24 @@ function profileFieldsFromImage(
     displayKey: string;
   },
 ) {
-  return slot === "cover"
-    ? {
-        coverOriginalKey: image.originalKey,
-        coverDisplayKey: image.displayKey,
-      }
-    : {
-        avatarOriginalKey: image.originalKey,
-        avatarDisplayKey: image.displayKey,
-      };
+  if (slot === "cover") {
+    return {
+      coverOriginalKey: image.originalKey,
+      coverDisplayKey: image.displayKey,
+    };
+  }
+
+  if (slot === "avatar") {
+    return {
+      avatarOriginalKey: image.originalKey,
+      avatarDisplayKey: image.displayKey,
+    };
+  }
+
+  return {
+    logoOriginalKey: image.originalKey,
+    logoDisplayKey: image.displayKey,
+  };
 }
 
 function getProfileSlotKeys(
@@ -72,17 +81,28 @@ function getProfileSlotKeys(
     coverDisplayKey: string | null;
     avatarOriginalKey: string | null;
     avatarDisplayKey: string | null;
+    logoOriginalKey: string | null;
+    logoDisplayKey: string | null;
   },
 ) {
-  return slot === "cover"
-    ? {
-        originalKey: profile.coverOriginalKey,
-        displayKey: profile.coverDisplayKey,
-      }
-    : {
-        originalKey: profile.avatarOriginalKey,
-        displayKey: profile.avatarDisplayKey,
-      };
+  if (slot === "cover") {
+    return {
+      originalKey: profile.coverOriginalKey,
+      displayKey: profile.coverDisplayKey,
+    };
+  }
+
+  if (slot === "avatar") {
+    return {
+      originalKey: profile.avatarOriginalKey,
+      displayKey: profile.avatarDisplayKey,
+    };
+  }
+
+  return {
+    originalKey: profile.logoOriginalKey,
+    displayKey: profile.logoDisplayKey,
+  };
 }
 
 function isOwnedProfileStorageKey(slot: ProfileImageSlot, key: string | null) {
@@ -96,6 +116,8 @@ async function cleanupOwnedProfileImages(
     coverDisplayKey: string | null;
     avatarOriginalKey: string | null;
     avatarDisplayKey: string | null;
+    logoOriginalKey: string | null;
+    logoDisplayKey: string | null;
   } | null,
 ) {
   if (!profile) {
@@ -304,10 +326,10 @@ export async function storeSiteProfileImage(
   const displayBuffer = await image
     .clone()
     .resize({
-      width: slot === "cover" ? 2200 : 900,
+      width: slot === "cover" ? 2200 : slot === "logo" ? 700 : 900,
       withoutEnlargement: true,
     })
-    .webp({ quality: slot === "cover" ? 86 : 84 })
+    .webp({ quality: slot === "cover" ? 86 : slot === "logo" ? 92 : 84 })
     .toBuffer();
 
   await Promise.all([

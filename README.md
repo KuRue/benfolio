@@ -11,7 +11,7 @@ This repository contains a production-leaning first pass of a self-hosted event 
 
 ## Repo layout
 
-- `app/` - Next.js web application, public gallery, admin UI, upload API
+- `app/` - Next.js web application, public gallery, admin UI, direct-upload signing API
 - `worker/` - BullMQ worker for EXIF extraction and derivative generation
 - `prisma/` - Prisma schema, generated client, seed, and migrations
 - `docs/` - architecture notes
@@ -35,6 +35,10 @@ Local Docker services:
 - `db` - PostgreSQL on port `5432`
 - `redis` - Redis on port `6379`
 - `minio` - S3-compatible local object storage on ports `9000` and `9001`
+
+Admin uploads now use short-lived, app-signed direct browser uploads into the originals
+bucket instead of a giant multipart POST through the Next.js server. Local MinIO setup
+applies a permissive localhost CORS policy for that direct-upload path.
 
 Local development continues to use `docker-compose.yml` and bind-mounted source. The
 published-image path below is separate and meant for server testing.
@@ -69,19 +73,21 @@ The workflow authenticates to `ghcr.io` with the built-in `GITHUB_TOKEN`, so pub
 does not need an extra registry secret as long as the repository has permission to write
 packages.
 
-## Server testing with GHCR images
+## First deploy
 
-Use `docker-compose.server.yml` for server testing with the published images. It keeps the
-local development compose file untouched.
+Use `docker-compose.server.yml` for the running stack and
+`docker-compose.server.init.yml` for the one-shot initialization path. Local development
+still uses `docker-compose.yml`.
 
-1. Pull the latest code on the server so you have `docker-compose.server.yml`.
-2. Copy `.env.example` to `.env` and fill in the production values you need:
-   - `APP_URL`
-   - `AUTH_COOKIE_SECRET`
-   - S3/R2 settings (`S3_ENDPOINT`, buckets, credentials)
-   - optionally `SERVER_DATABASE_URL` if you want the published containers to use an external Postgres instance instead of the bundled `db` service
-   - optionally `SERVER_REDIS_URL` if you want the published containers to use an external Redis instance instead of the bundled `redis` service
-3. If the package is private, log in to GHCR before pulling:
+### 1. Pull the repo and log in to GHCR
+
+Pull the latest repo on the server so you have:
+
+- `docker-compose.server.yml`
+- `docker-compose.server.init.yml`
+- `.env.example`
+
+If the package is private, log in to GHCR before pulling:
 
 ```bash
 echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
@@ -93,14 +99,74 @@ In practice that usually means either:
 - a classic personal access token with `read:packages`
 - or a fine-grained token with package read access if your org/package settings allow it
 
-4. Pull and start the test stack:
+### 2. Create `.env`
+
+Copy `.env.example` to `.env`.
+
+Required for a real deployment:
+
+- `APP_URL`
+- `AUTH_COOKIE_SECRET`
+- `S3_ENDPOINT`
+- `S3_PUBLIC_ENDPOINT`
+- `S3_ACCESS_KEY_ID`
+- `S3_SECRET_ACCESS_KEY`
+- `S3_BUCKET_ORIGINALS`
+- `S3_BUCKET_DERIVATIVES`
+
+Usually leave as-is unless you have a reason to change them:
+
+- `S3_REGION`
+- `S3_FORCE_PATH_STYLE`
+- `IMPORTS_PREFIX`
+- `IMPORTS_CLEANUP_MODE`
+- `IMPORTS_ARCHIVE_PREFIX`
+- `STORAGE_WEBHOOK_SIGNATURE_HEADER`
+
+Optional and safe to leave blank or unset:
+
+- `STORAGE_WEBHOOK_SECRET`
+  This disables webhook signature verification and is fine if webhook traffic stays on a trusted network.
+- `SEED_ADMIN_NAME`
+- `SEED_ADMIN_EMAIL`
+- `SEED_ADMIN_PASSWORD`
+  If these are blank, seed still creates the default `SiteProfile` and you can create the first admin later at `/admin/bootstrap`.
+- `SERVER_DATABASE_URL`
+- `SERVER_REDIS_URL`
+  If these are blank or unset, the server compose file uses the bundled Postgres and Redis services.
+
+### 3. Run one-time init
+
+Run migrations, generate the Prisma client, and seed the initial data once:
+
+```bash
+docker compose -f docker-compose.server.yml -f docker-compose.server.init.yml run --rm init
+```
+
+That command runs `npm run deploy:init`, which currently does:
+
+```bash
+npm run db:generate
+npm run db:deploy
+npm run db:seed
+```
+
+The normal `web` and `worker` services do not block on this init path. Run it once for a
+fresh deployment and again whenever you intentionally want to apply new migrations and seed changes.
+
+### 4. Start the app and worker
 
 ```bash
 docker compose -f docker-compose.server.yml pull
 docker compose -f docker-compose.server.yml up -d
 ```
 
-5. Open the app at `http://<server>:3000`.
+Open the app at `http://<server>:3000`.
+
+### 5. Create or verify the first admin
+
+- If `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` were set during init, sign in with that account.
+- If they were left blank, visit `/admin/bootstrap` once to create the first admin.
 
 `docker-compose.server.yml` intentionally maps runtime `DATABASE_URL` and `REDIS_URL`
 from `SERVER_DATABASE_URL` and `SERVER_REDIS_URL` so the repository's existing
@@ -108,18 +174,32 @@ from `SERVER_DATABASE_URL` and `SERVER_REDIS_URL` so the repository's existing
 networking on a server. If you leave those `SERVER_*` vars unset, the stack uses the bundled
 Postgres and Redis services.
 
+`docker-compose.server.init.yml` intentionally uses a separate one-shot Node container so
+first-run Prisma setup is explicit and does not get coupled to the long-running `web` or
+`worker` startup path.
+
 Use a different image tag by setting `BENFOLIO_IMAGE_TAG`, for example:
 
 ```bash
 BENFOLIO_IMAGE_TAG=sha-abcdef1 docker compose -f docker-compose.server.yml up -d
 ```
 
-For now, database migrations remain a manual step outside the published runtime images.
-Before first boot on a server, run `npm run db:deploy` from a checkout of this repo or from
-your existing release/deploy process.
-
 To manually trigger image publishing, open the repository's **Actions** tab, select
 **Publish GHCR Images**, and use **Run workflow** on the branch you want to build.
+
+### Unraid / stack note
+
+If you are using an Unraid stack or another compose UI, the simplest path is:
+
+1. Pull this repo into the stack directory.
+2. Copy `.env.example` to `.env`.
+3. Run the init command once from a shell in that directory:
+
+```bash
+docker compose -f docker-compose.server.yml -f docker-compose.server.init.yml run --rm init
+```
+
+4. Then start the normal server stack from the UI or with `docker compose -f docker-compose.server.yml up -d`.
 
 ## Environment
 
@@ -128,6 +208,7 @@ Core env vars are documented in `.env.example`.
 For local Docker, Compose already injects working defaults. For production, point the S3-compatible settings to Cloudflare R2:
 
 - `S3_ENDPOINT`
+- `S3_PUBLIC_ENDPOINT`
 - `S3_REGION`
 - `S3_ACCESS_KEY_ID`
 - `S3_SECRET_ACCESS_KEY`
@@ -141,8 +222,16 @@ For local Docker, Compose already injects working defaults. For production, poin
 - `STORAGE_WEBHOOK_SIGNATURE_HEADER`
 
 The app intentionally keeps originals private and serves downloads through `/download/[id]`.
+`S3_PUBLIC_ENDPOINT` should be a browser-reachable S3/R2 API origin for presigned direct
+uploads. In local Docker that is `http://localhost:9000`; in production it should point at
+your public R2/S3 API endpoint rather than an internal-only service hostname.
 Storage-folder imports are scanned from the originals bucket under `imports/<event-slug>/...` by default.
 If `STORAGE_WEBHOOK_SECRET` is set, `/api/webhooks/storage` expects an HMAC-SHA256 signature in the configured header.
+
+For direct browser uploads, the originals bucket must allow CORS for your gallery origin on
+`PUT` requests. Local MinIO CORS is configured automatically by `docker-compose.yml`; for
+Cloudflare R2 or another S3-compatible provider you still need to configure bucket CORS on
+the storage side.
 
 ## Database and Prisma
 
@@ -167,7 +256,7 @@ Seed behavior:
 - built-in admin bootstrap and login flows
 - protected admin overview, event CRUD, and upload pages
 - protected admin imports page for scanning `imports/<event-slug>/...` storage prefixes
-- upload API that stores originals and enqueues Redis jobs
+- direct-upload signing API that sends originals straight from the browser to private object storage and then enqueues Redis jobs after registration
 - imports scan flow that creates or reuses draft events, records per-file import items, and reuses the existing photo worker pipeline
 - targeted storage webhook route for object-create events under the imports prefix
 - adapter-based storage webhook parsing with generic S3 payloads plus a Cloudflare R2-oriented relay shape

@@ -4,8 +4,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PhotoGrid } from "@/components/public/photo-grid";
+import { PublicSiteMark } from "@/components/public/public-site-mark";
 import { PublicPhotoSearchLauncher } from "@/components/public/public-photo-search-launcher";
-import { getPublicEventBySlug } from "@/lib/gallery";
+import { getPublicEventBySlug, getSiteProfile } from "@/lib/gallery";
 import { absoluteUrl, formatLongDate } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
 
@@ -59,7 +60,10 @@ export async function generateMetadata({
 
 export default async function EventPage({ params }: EventPageProps) {
   const { slug } = await params;
-  const event = await getPublicEventBySlug(slug);
+  const [event, siteProfile] = await Promise.all([
+    getPublicEventBySlug(slug),
+    getSiteProfile(),
+  ]);
 
   if (!event) {
     notFound();
@@ -83,9 +87,15 @@ export default async function EventPage({ params }: EventPageProps) {
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_34%,_rgba(0,0,0,0.18)_100%)]" />
+            <div className="absolute left-3 top-3 z-10 sm:left-4 sm:top-4">
+              <PublicSiteMark
+                displayName={siteProfile.displayName}
+                logoDisplayKey={siteProfile.logoDisplayKey}
+              />
+            </div>
             <div className="absolute right-3 top-3 z-10 sm:right-4 sm:top-4">
               <PublicPhotoSearchLauncher
-                triggerClassName="floating-action inline-flex h-9 w-9 items-center justify-center text-white/68 transition hover:bg-white/10 hover:text-white"
+                triggerClassName="floating-action inline-flex h-11 w-11 items-center justify-center text-white/68 transition hover:bg-white/10 hover:text-white"
               />
             </div>
             <div className="relative flex min-h-[10rem] flex-col justify-end p-4 sm:min-h-[11.5rem] sm:p-5 lg:min-h-[13rem] lg:p-6">

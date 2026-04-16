@@ -3,6 +3,7 @@ import { SiteProfileForm } from "@/components/admin/site-profile-form";
 import { SiteProfilePhotoLibrary } from "@/components/admin/site-profile-photo-library";
 import { SiteHeader } from "@/components/public/site-header";
 import { getAdminSiteProfileData } from "@/lib/admin-data";
+import { buildDisplayUrl } from "@/lib/storage";
 
 export default async function AdminSettingsPage() {
   const { siteProfile, libraryPhotos } = await getAdminSiteProfileData();
@@ -26,11 +27,14 @@ export default async function AdminSettingsPage() {
         initialValues={{
           displayName: siteProfile.displayName,
           handle: siteProfile.handle ?? "",
+          linkUrl: siteProfile.websiteUrl ?? siteProfile.instagramUrl ?? "",
           headline: siteProfile.headline,
           bio: siteProfile.bio,
           coverFocalX: siteProfile.coverFocalX ?? 50,
           coverFocalY: siteProfile.coverFocalY ?? 50,
         }}
+        currentCoverUrl={buildDisplayUrl(siteProfile.coverDisplayKey)}
+        currentLogoUrl={buildDisplayUrl(siteProfile.logoDisplayKey)}
       />
 
       <SiteProfilePhotoLibrary
