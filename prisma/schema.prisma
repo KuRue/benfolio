@@ -106,6 +106,8 @@ model SiteProfile {
   avatarDisplayKey  String?
   coverOriginalKey  String?
   coverDisplayKey   String?
+  coverFocalX       Int?
+  coverFocalY       Int?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -203,11 +205,28 @@ model Tag {
   slug      String
   name      String
   createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
   photos    PhotoTag[]
+  aliases   TagAlias[]
 
   @@unique([category, slug])
   @@index([category, name])
   @@index([slug])
+}
+
+model TagAlias {
+  id        String      @id @default(cuid())
+  tagId      String
+  category  TagCategory
+  slug      String
+  name      String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  tag       Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([category, slug])
+  @@index([tagId])
+  @@index([category, name])
 }
 
 model PhotoTag {

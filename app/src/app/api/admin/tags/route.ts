@@ -29,11 +29,13 @@ export async function GET(request: Request) {
   const query = searchParams.get("q");
   const category = asTagCategory(searchParams.get("category"));
   const limitValue = Number.parseInt(searchParams.get("limit") ?? "12", 10);
+  const excludeTagId = searchParams.get("excludeTagId");
 
   const tags = await searchAdminTags({
     query,
     category,
     limit: Number.isFinite(limitValue) ? limitValue : 12,
+    excludeTagId,
   });
 
   return NextResponse.json({
@@ -42,7 +44,9 @@ export async function GET(request: Request) {
       name: tag.name,
       slug: tag.slug,
       category: tag.category,
-      photoCount: tag._count.photos,
+      photoCount: tag.photoCount,
+      aliasCount: tag.aliasCount,
+      matchedAliases: tag.matchedAliases,
     })),
   });
 }

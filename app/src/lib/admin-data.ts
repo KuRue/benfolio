@@ -28,6 +28,8 @@ const defaultSiteProfile = {
   avatarDisplayKey: null,
   coverOriginalKey: null,
   coverDisplayKey: null,
+  coverFocalX: 50,
+  coverFocalY: 50,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 };
@@ -120,6 +122,25 @@ function buildAdminEventPhotoWhere(args: {
                 {
                   slug: {
                     contains: args.query.toLowerCase(),
+                  },
+                },
+                {
+                  aliases: {
+                    some: {
+                      OR: [
+                        {
+                          name: {
+                            contains: args.query,
+                            mode: "insensitive",
+                          },
+                        },
+                        {
+                          slug: {
+                            contains: args.query.toLowerCase(),
+                          },
+                        },
+                      ],
+                    },
                   },
                 },
               ],

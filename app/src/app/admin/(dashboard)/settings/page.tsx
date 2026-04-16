@@ -8,18 +8,15 @@ export default async function AdminSettingsPage() {
   const { siteProfile, libraryPhotos } = await getAdminSiteProfileData();
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
+    <div className="space-y-6">
+      <section className="space-y-2">
         <p className="editorial-label">Settings</p>
-        <h1 className="font-serif text-4xl tracking-[-0.03em] text-white">
+        <h1 className="font-serif text-3xl tracking-[-0.03em] text-white sm:text-[2.5rem]">
           Homepage profile
         </h1>
-        <p className="max-w-2xl text-sm text-white/58">
-          Adjust the public header.
-        </p>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-3">
         <p className="editorial-label">Preview</p>
         <SiteHeader profile={siteProfile} showSearch={false} />
       </section>
@@ -31,6 +28,8 @@ export default async function AdminSettingsPage() {
           handle: siteProfile.handle ?? "",
           headline: siteProfile.headline,
           bio: siteProfile.bio,
+          coverFocalX: siteProfile.coverFocalX ?? 50,
+          coverFocalY: siteProfile.coverFocalY ?? 50,
         }}
       />
 

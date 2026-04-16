@@ -12,6 +12,9 @@ type PhotoPageProps = {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{
+    from?: string;
+  }>;
 };
 
 export async function generateMetadata({
@@ -58,13 +61,14 @@ export async function generateMetadata({
   };
 }
 
-export default async function PhotoPage({ params }: PhotoPageProps) {
+export default async function PhotoPage({ params, searchParams }: PhotoPageProps) {
   const { id } = await params;
+  const { from } = await searchParams;
   const viewer = await getPhotoViewerData(id);
 
   if (!viewer) {
     notFound();
   }
 
-  return <PhotoViewerShell viewer={viewer} />;
+  return <PhotoViewerShell viewer={viewer} returnHref={from} />;
 }

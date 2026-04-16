@@ -14,6 +14,8 @@ type SiteProfileFormProps = {
     handle: string;
     headline: string;
     bio: string;
+    coverFocalX: number;
+    coverFocalY: number;
   };
 };
 
@@ -26,15 +28,12 @@ export function SiteProfileForm({
   const [state, formAction, pending] = useActionState(action, initialState);
 
   return (
-    <form action={formAction} className="admin-card space-y-6 px-6 py-6">
-      <div className="space-y-2">
+    <form action={formAction} className="admin-card space-y-5 px-5 py-5 sm:px-6 sm:py-6">
+      <div className="space-y-1.5">
         <p className="editorial-label">Homepage Profile</p>
-        <h2 className="font-serif text-3xl tracking-[-0.03em] text-white">
+        <h2 className="font-serif text-[2rem] tracking-[-0.03em] text-white">
           Public header
         </h2>
-        <p className="max-w-2xl text-sm text-white/58">
-          Direct uploads are optional.
-        </p>
       </div>
 
       {state.success ? (
@@ -79,22 +78,48 @@ export function SiteProfileForm({
             name="headline"
             defaultValue={initialValues.headline}
             className="admin-input"
-            placeholder="Event photography with a clean, modern archive."
+            placeholder="One short line."
           />
         </label>
 
         <label className="block space-y-2 xl:col-span-2">
-          <span className="text-sm text-white/68">Bio</span>
+          <span className="text-sm text-white/68">Bio fallback</span>
           <textarea
             name="bio"
             defaultValue={initialValues.bio}
             className="admin-textarea"
-            placeholder="Optional longer bio"
+            placeholder="Used if the short intro is blank."
           />
         </label>
 
+        <div className="grid gap-4 rounded-[1.2rem] border border-white/8 bg-white/[0.03] px-4 py-4 xl:col-span-2 sm:grid-cols-2">
+          <label className="block space-y-2">
+            <span className="text-sm text-white/68">Banner focus X</span>
+            <input
+              name="coverFocalX"
+              type="range"
+              min="0"
+              max="100"
+              defaultValue={initialValues.coverFocalX}
+              className="w-full accent-white"
+            />
+          </label>
+
+          <label className="block space-y-2">
+            <span className="text-sm text-white/68">Banner focus Y</span>
+            <input
+              name="coverFocalY"
+              type="range"
+              min="0"
+              max="100"
+              defaultValue={initialValues.coverFocalY}
+              className="w-full accent-white"
+            />
+          </label>
+        </div>
+
         <label className="block space-y-2">
-          <span className="text-sm text-white/68">Direct hero upload</span>
+          <span className="text-sm text-white/68">Upload banner</span>
           <input
             name="heroImage"
             type="file"
@@ -104,7 +129,7 @@ export function SiteProfileForm({
         </label>
 
         <label className="block space-y-2">
-          <span className="text-sm text-white/68">Direct avatar upload</span>
+          <span className="text-sm text-white/68">Upload avatar</span>
           <input
             name="avatarImage"
             type="file"
@@ -119,7 +144,7 @@ export function SiteProfileForm({
         disabled={pending}
         className="rounded-full bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-60"
       >
-        {pending ? "Saving..." : "Save homepage profile"}
+        {pending ? "Saving..." : "Save"}
       </button>
     </form>
   );

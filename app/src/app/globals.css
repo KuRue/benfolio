@@ -80,7 +80,8 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
-  border: 1px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.02);
   color: rgba(255, 255, 255, 0.86);
   transition:
     background-color 180ms ease,
@@ -92,7 +93,7 @@ body {
 
 .viewer-control:hover:not(:disabled) {
   border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
   color: white;
   transform: translateY(-1px);
 }
@@ -108,6 +109,7 @@ body {
 }
 
 .viewer-control:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
   transform: scale(0.97);
 }
 

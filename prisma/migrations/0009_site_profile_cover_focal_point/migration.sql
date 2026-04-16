@@ -1,0 +1,3 @@
+ALTER TABLE "SiteProfile"
+ADD COLUMN "coverFocalX" INTEGER,
+ADD COLUMN "coverFocalY" INTEGER;

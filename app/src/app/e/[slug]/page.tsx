@@ -68,28 +68,32 @@ export default async function EventPage({ params }: EventPageProps) {
   const coverUrl = buildDisplayUrl(event.coverDisplayKey);
 
   return (
-    <main className="pb-20 pt-3 sm:pt-4 lg:pt-5">
-      <div className="mx-auto flex w-[min(100%-1rem,96rem)] flex-col gap-4 sm:w-[min(100%-1.5rem,96rem)] sm:gap-5">
-        <section className="solid-panel overflow-hidden">
-          <div className="relative min-h-[13rem] overflow-hidden sm:min-h-[15rem] lg:min-h-[17rem]">
+    <main className="pb-16 pt-2 sm:pt-3 lg:pt-4">
+      <div className="mx-auto flex w-[min(100%-0.75rem,110rem)] flex-col gap-3 sm:w-[min(100%-1.25rem,110rem)] sm:gap-4">
+        <section className="overflow-hidden rounded-[1.5rem] border border-white/8 bg-[#090909] shadow-[0_28px_96px_rgba(0,0,0,0.34)]">
+          <div className="relative min-h-[10rem] overflow-hidden sm:min-h-[11.5rem] lg:min-h-[13rem]">
             {coverUrl ? (
-              <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img
+                src={coverUrl}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+              />
             ) : (
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(197,146,92,0.26),_transparent_32%),linear-gradient(145deg,_#141414,_#070707)]" />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/26 to-transparent" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_30%,_rgba(0,0,0,0.22)_100%)]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_34%,_rgba(0,0,0,0.18)_100%)]" />
             <div className="absolute right-3 top-3 z-10 sm:right-4 sm:top-4">
               <PublicPhotoSearchLauncher
-                triggerClassName="floating-action inline-flex h-10 w-10 items-center justify-center text-white/74 transition hover:bg-white/10 hover:text-white"
+                triggerClassName="floating-action inline-flex h-9 w-9 items-center justify-center text-white/68 transition hover:bg-white/10 hover:text-white"
               />
             </div>
-            <div className="relative flex min-h-[13rem] flex-col justify-end p-4 sm:min-h-[15rem] sm:p-6 lg:min-h-[17rem] lg:p-8">
-              <div className="max-w-4xl space-y-3">
-                <h1 className="font-serif text-[2.5rem] leading-none tracking-[-0.045em] text-white sm:text-[3.4rem] lg:text-[4.3rem]">
+            <div className="relative flex min-h-[10rem] flex-col justify-end p-4 sm:min-h-[11.5rem] sm:p-5 lg:min-h-[13rem] lg:p-6">
+              <div className="max-w-4xl space-y-2">
+                <h1 className="font-serif text-[2.2rem] leading-none tracking-[-0.045em] text-white sm:text-[2.9rem] lg:text-[3.6rem]">
                   {event.title}
                 </h1>
-                <div className="flex flex-wrap gap-x-4 gap-y-2 text-[0.68rem] uppercase tracking-[0.28em] text-white/56 sm:text-[0.72rem]">
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[0.68rem] uppercase tracking-[0.28em] text-white/56 sm:text-[0.72rem]">
                   <span>{formatLongDate(event.eventDate)}</span>
                   {event.location ? <span>{event.location}</span> : null}
                 </div>
@@ -99,7 +103,7 @@ export default async function EventPage({ params }: EventPageProps) {
         </section>
 
         <section>
-          <PhotoGrid photos={event.photos} />
+          <PhotoGrid photos={event.photos} returnHref={`/e/${event.slug}`} />
         </section>
       </div>
     </main>

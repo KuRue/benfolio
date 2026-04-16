@@ -8,13 +8,11 @@ export default async function Home() {
   const { siteProfile, events } = await getHomepageData();
 
   return (
-    <main className="pb-20 pt-3 sm:pt-4 lg:pt-5">
-      <div className="section-shell space-y-5 sm:space-y-6 lg:space-y-7">
+    <main className="pb-16 pt-2 sm:pt-3 lg:pt-4">
+      <div className="section-shell space-y-4 sm:space-y-5">
         <SiteHeader profile={siteProfile} />
 
-        <section className="space-y-4 sm:space-y-5">
-          <p className="editorial-label">Events</p>
-
+        <section>
           {events.length ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-5">
               {events.map((event) => (

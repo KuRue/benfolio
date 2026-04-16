@@ -36,14 +36,49 @@ type PhotoViewerShellProps = {
     nextHref: string | null;
   };
   isModal?: boolean;
+  returnHref?: string | null;
 };
+
+function sanitizeReturnHref(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  if (!value.startsWith("/") || value.startsWith("//")) {
+    return null;
+  }
+
+  return value;
+}
+
+function withReturnHref(href: string | null, returnHref: string | null) {
+  if (!href) {
+    return null;
+  }
+
+  if (!returnHref) {
+    return href;
+  }
+
+  const params = new URLSearchParams();
+  params.set("from", returnHref);
+  return `${href}?${params.toString()}`;
+}
 
 export function PhotoViewerShell({
   viewer,
   isModal = false,
+  returnHref,
 }: PhotoViewerShellProps) {
-  const heading = viewer.title ?? viewer.event.title;
-  const subtitle = viewer.caption ?? (viewer.title ? viewer.event.title : "");
+  const normalizedReturnHref = sanitizeReturnHref(returnHref);
+  const heading =
+    viewer.title?.trim() ||
+    viewer.caption?.trim() ||
+    viewer.event.title;
+  const subtitle =
+    viewer.title?.trim() && viewer.caption?.trim()
+      ? viewer.caption.trim()
+      : null;
   const infoRows = [
     viewer.capturedAt
       ? { label: "Captured", value: formatLongDate(viewer.capturedAt) }
@@ -73,12 +108,13 @@ export function PhotoViewerShell({
       imageHeight={viewer.imageHeight}
       alt={viewer.altText ?? heading}
       title={heading}
-      subtitle={subtitle}
+      subtitle={subtitle ?? ""}
+      eventTitle={viewer.event.title}
       eventHref={viewer.eventHref}
       downloadHref={`/download/${viewer.id}`}
-      previousHref={viewer.previousHref}
-      nextHref={viewer.nextHref}
-      closeHref={viewer.eventHref}
+      previousHref={withReturnHref(viewer.previousHref, normalizedReturnHref)}
+      nextHref={withReturnHref(viewer.nextHref, normalizedReturnHref)}
+      closeHref={normalizedReturnHref ?? (!isModal ? viewer.eventHref : undefined)}
       infoRows={infoRows}
       tagGroups={tagGroups}
       isModal={isModal}

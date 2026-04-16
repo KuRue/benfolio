@@ -18,6 +18,8 @@ const defaultSiteProfile = {
   avatarDisplayKey: null,
   coverOriginalKey: null,
   coverDisplayKey: null,
+  coverFocalX: 50,
+  coverFocalY: 50,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 };

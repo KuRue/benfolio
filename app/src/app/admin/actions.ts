@@ -57,6 +57,20 @@ function normalizeHandle(value: string) {
   return normalized || null;
 }
 
+function normalizePercent(value: FormDataEntryValue | null, fallback = 50) {
+  if (typeof value !== "string" || !value.trim()) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(100, Math.max(0, parsed));
+}
+
 async function slugIsTaken(slug: string, excludeId?: string) {
   const existing = await prisma.event.findUnique({
     where: {
@@ -248,6 +262,8 @@ export async function updateSiteProfileAction(
   const bio =
     asString(formData.get("bio")) ||
     "A mobile-first archive for event coverage, client galleries, and private releases.";
+  const coverFocalX = normalizePercent(formData.get("coverFocalX"));
+  const coverFocalY = normalizePercent(formData.get("coverFocalY"));
 
   if (!displayName) {
     return {
@@ -265,6 +281,8 @@ export async function updateSiteProfileAction(
       handle,
       headline,
       bio,
+      coverFocalX,
+      coverFocalY,
     },
     create: {
       id: "default",
@@ -272,6 +290,8 @@ export async function updateSiteProfileAction(
       handle,
       headline,
       bio,
+      coverFocalX,
+      coverFocalY,
     },
   });
 
