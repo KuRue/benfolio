@@ -23,11 +23,7 @@ type SiteHeaderProps = {
   showSearch?: boolean;
 };
 
-function getLinkLabel(linkHref: string | null, instagramUrl: string | null) {
-  if (!linkHref) {
-    return null;
-  }
-
+function getLinkLabel(linkHref: string, instagramUrl: string | null) {
   if (instagramUrl && linkHref === instagramUrl) {
     return "Instagram";
   }
@@ -39,12 +35,29 @@ function getLinkLabel(linkHref: string | null, instagramUrl: string | null) {
   }
 }
 
+function buildProfileLinks(
+  websiteUrl: string | null,
+  instagramUrl: string | null,
+) {
+  const links: Array<{ href: string; label: string }> = [];
+  const seen = new Set<string>();
+
+  for (const href of [websiteUrl, instagramUrl]) {
+    if (!href || seen.has(href)) {
+      continue;
+    }
+    seen.add(href);
+    links.push({ href, label: getLinkLabel(href, instagramUrl) });
+  }
+
+  return links;
+}
+
 export function SiteHeader({ profile, showSearch = true }: SiteHeaderProps) {
   const avatarUrl = buildDisplayUrl(profile.avatarDisplayKey);
   const coverUrl = buildDisplayUrl(profile.coverDisplayKey);
   const publicBio = profile.headline.trim() || profile.bio.trim();
-  const linkHref = profile.websiteUrl ?? profile.instagramUrl;
-  const linkLabel = getLinkLabel(linkHref, profile.instagramUrl);
+  const profileLinks = buildProfileLinks(profile.websiteUrl, profile.instagramUrl);
   const coverPosition = `${profile.coverFocalX ?? 50}% ${profile.coverFocalY ?? 50}%`;
 
   return (
@@ -109,16 +122,19 @@ export function SiteHeader({ profile, showSearch = true }: SiteHeaderProps) {
             ) : null}
           </div>
 
-          {linkHref && linkLabel ? (
-            <div className="flex justify-center sm:justify-start sm:pb-1 lg:justify-end">
-              <Link
-                href={linkHref}
-                target="_blank"
-                rel="noreferrer"
-                className="floating-action inline-flex h-9 items-center justify-center px-4 text-sm text-white/82 transition hover:bg-white/12 hover:text-white"
-              >
-                {linkLabel}
-              </Link>
+          {profileLinks.length ? (
+            <div className="flex flex-wrap justify-center gap-2 sm:justify-start sm:pb-1 lg:justify-end">
+              {profileLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="floating-action inline-flex h-9 items-center justify-center px-4 text-sm text-white/82 transition hover:bg-white/12 hover:text-white"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
           ) : null}
         </div>

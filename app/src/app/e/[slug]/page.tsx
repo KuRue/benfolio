@@ -106,7 +106,13 @@ export default async function EventPage({ params }: EventPageProps) {
                 <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[0.68rem] uppercase tracking-[0.28em] text-white/56 sm:text-[0.72rem]">
                   <span>{formatLongDate(event.eventDate)}</span>
                   {event.location ? <span>{event.location}</span> : null}
+                  <span>{event.photos.length} photo{event.photos.length === 1 ? "" : "s"}</span>
                 </div>
+                {event.description ? (
+                  <p className="max-w-2xl overflow-hidden text-pretty text-sm leading-6 text-white/68 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] sm:text-[0.95rem] sm:leading-7">
+                    {event.description}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
