@@ -228,10 +228,40 @@ your public R2/S3 API endpoint rather than an internal-only service hostname.
 Storage-folder imports are scanned from the originals bucket under `imports/<event-slug>/...` by default.
 If `STORAGE_WEBHOOK_SECRET` is set, `/api/webhooks/storage` expects an HMAC-SHA256 signature in the configured header.
 
-For direct browser uploads, the originals bucket must allow CORS for your gallery origin on
-`PUT` requests. Local MinIO CORS is configured automatically by `docker-compose.yml`; for
-Cloudflare R2 or another S3-compatible provider you still need to configure bucket CORS on
-the storage side.
+### Direct browser uploads (required for admin upload to work)
+
+Uploads go straight from the browser to the originals bucket. Two things must be set on the
+storage side before admin uploads will work in production — without these, the admin page
+shows "Could not reach storage" errors:
+
+1. **`S3_PUBLIC_ENDPOINT`** must be a browser-reachable HTTPS origin, not an internal
+   service name. For Cloudflare R2 that is usually
+   `https://<account-id>.r2.cloudflarestorage.com`. If you front R2 with a custom domain,
+   use that instead. Mixed-content (http endpoint on an https gallery) will be blocked.
+
+2. **The originals bucket must have a CORS policy** allowing `PUT` from your gallery
+   origin. Local MinIO is configured automatically by `docker-compose.yml`. For R2, apply
+   a policy like this via `wrangler r2 bucket cors put <bucket>` or the R2 dashboard:
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://your-gallery-domain.example"],
+       "AllowedMethods": ["PUT", "GET", "HEAD"],
+       "AllowedHeaders": ["content-type"],
+       "ExposeHeaders": ["ETag"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+   The admin upload flow only signs `Content-Type` on the presigned PUT, so
+   `AllowedHeaders` can be that narrow. If you add a custom domain later, include both the
+   apex and any subdomains you load the gallery from.
+
+If uploads fail, open devtools → Network, retry, and inspect the failing `PUT` request and
+the `OPTIONS` preflight. The console will also log the target URL and any response body
+the storage layer returned.
 
 ## Database and Prisma
 

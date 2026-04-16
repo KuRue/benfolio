@@ -25,6 +25,14 @@ const s3 = new S3Client({
   },
 });
 
+// Separate client used only for generating presigned upload URLs. Two things matter here
+// that don't apply to server-side S3 calls:
+//   1. `endpoint` must be a browser-reachable origin, not an internal service name.
+//   2. Default checksum calculation must be disabled. Starting in @aws-sdk/client-s3
+//      v3.729+, PutObject hoists a placeholder `x-amz-checksum-crc32=AAAAAA==` into the
+//      signed URL at presign time. R2 (and S3) then reject the real PUT with 403 because
+//      the uploaded body's CRC32 doesn't match the zero placeholder — surfaced by Firefox
+//      as a CORS error because the 403 response has no CORS headers.
 const uploadS3 = new S3Client({
   region: env.S3_REGION,
   endpoint: env.S3_PUBLIC_ENDPOINT ?? env.S3_ENDPOINT,
@@ -33,6 +41,8 @@ const uploadS3 = new S3Client({
     accessKeyId: env.S3_ACCESS_KEY_ID,
     secretAccessKey: env.S3_SECRET_ACCESS_KEY,
   },
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  responseChecksumValidation: "WHEN_REQUIRED",
 });
 
 export const storageBuckets = {
@@ -58,39 +68,16 @@ export async function uploadObject(args: {
   );
 }
 
-type UploadMetadataValue = string | number | boolean | null | undefined;
-
-function normalizeUploadMetadata(
-  metadata: Record<string, UploadMetadataValue> | undefined,
-) {
-  if (!metadata) {
-    return undefined;
-  }
-
-  const normalized = Object.fromEntries(
-    Object.entries(metadata)
-      .filter(([, value]) => value !== null && value !== undefined && value !== "")
-      .map(([key, value]) => [key.toLowerCase(), String(value)]),
-  );
-
-  return Object.keys(normalized).length ? normalized : undefined;
-}
-
 export async function presignUploadObject(args: {
   bucket: string;
   key: string;
   contentType: string;
-  cacheControl?: string;
   expiresInSeconds?: number;
-  metadata?: Record<string, UploadMetadataValue>;
 }) {
-  const metadata = normalizeUploadMetadata(args.metadata);
   const command = new PutObjectCommand({
     Bucket: args.bucket,
     Key: args.key,
     ContentType: args.contentType,
-    CacheControl: args.cacheControl,
-    Metadata: metadata,
   });
   const url = await getSignedUrl(uploadS3, command, {
     expiresIn: args.expiresInSeconds ?? 60 * 15,
@@ -101,14 +88,6 @@ export async function presignUploadObject(args: {
     url,
     headers: {
       "Content-Type": args.contentType,
-      ...(metadata
-        ? Object.fromEntries(
-            Object.entries(metadata).map(([key, value]) => [
-              `x-amz-meta-${key}`,
-              value,
-            ]),
-          )
-        : {}),
     },
   };
 }

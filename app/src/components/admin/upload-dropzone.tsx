@@ -150,7 +150,21 @@ function uploadFileToSignedTarget(args: {
     };
 
     request.onerror = () => {
-      reject(new Error(`Network error while uploading ${args.file.name}.`));
+      // onerror fires when no HTTP response reached the browser — almost always a CORS
+      // preflight failure, DNS/connection issue, or mixed-content block. Log the target
+      // URL so the admin can inspect the storage-side response in devtools Network tab.
+      // eslint-disable-next-line no-console
+      console.error("Direct upload failed (no response)", {
+        filename: args.file.name,
+        method: args.target.uploadMethod,
+        url: args.target.uploadUrl,
+        hint: "Check the storage bucket CORS policy and that S3_PUBLIC_ENDPOINT is browser-reachable.",
+      });
+      reject(
+        new Error(
+          `Could not reach storage for ${args.file.name}. Likely a CORS or endpoint issue — see devtools console for the target URL.`,
+        ),
+      );
     };
 
     request.onload = () => {
@@ -160,9 +174,18 @@ function uploadFileToSignedTarget(args: {
         return;
       }
 
+      // Storage (S3/R2) returns useful XML in the body on rejection — surface it.
+      const bodySnippet = (request.responseText || "").slice(0, 300);
+      // eslint-disable-next-line no-console
+      console.error("Storage rejected direct upload", {
+        filename: args.file.name,
+        status: request.status,
+        url: args.target.uploadUrl,
+        body: bodySnippet,
+      });
       reject(
         new Error(
-          `Storage upload failed for ${args.file.name} (${request.status}).`,
+          `Storage upload failed for ${args.file.name} (${request.status}). ${bodySnippet ? "See devtools console for details." : ""}`.trim(),
         ),
       );
     };

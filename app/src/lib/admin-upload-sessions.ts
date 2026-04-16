@@ -211,12 +211,6 @@ export async function prepareDirectUploadSession(args: {
           bucket: storageBuckets.originals,
           key: originalKey,
           contentType: originalMimeType,
-          cacheControl: "private, max-age=0, no-store",
-          metadata: {
-            "photo-id": photoId,
-            "event-id": event.id,
-            "import-job-id": importJob.id,
-          },
         });
 
         return {
@@ -369,16 +363,6 @@ export async function completeDirectUploadSession(args: {
         verificationFailures.push({
           clientId: file.clientId,
           error: `${file.originalFilename} uploaded with an unexpected size.`,
-        });
-        continue;
-      }
-
-      const storedPhotoId = object.metadata["photo-id"];
-
-      if (storedPhotoId && storedPhotoId !== file.photoId) {
-        verificationFailures.push({
-          clientId: file.clientId,
-          error: `${file.originalFilename} did not match the signed upload target.`,
         });
         continue;
       }
