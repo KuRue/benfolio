@@ -187,6 +187,8 @@ export function PhotoViewerClient({
       return;
     }
 
+    revealControls();
+
     startTransition(() => {
       if (isModal) {
         router.replace(href, { scroll: false });
@@ -204,9 +206,19 @@ export function PhotoViewerClient({
     }
   }
 
-  function revealControls() {
+  const scheduleHideControls = useEffectEvent(() => {
     clearControlsTimeout();
+    if (infoOpen) {
+      return;
+    }
+    controlsTimeoutRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+    }, touchLayout ? 5000 : 4000);
+  });
+
+  function revealControls() {
     setControlsVisible(true);
+    scheduleHideControls();
   }
 
   function handleClose() {
@@ -262,22 +274,18 @@ export function PhotoViewerClient({
   }, []);
 
   useEffect(() => {
-    clearControlsTimeout();
-
-    if (!controlsVisible || infoOpen) {
-      return () => {
-        clearControlsTimeout();
-      };
+    if (infoOpen) {
+      clearControlsTimeout();
+      setControlsVisible(true);
+      return;
     }
 
-    controlsTimeoutRef.current = window.setTimeout(() => {
-      setControlsVisible(false);
-    }, touchLayout ? 5000 : 4000);
+    scheduleHideControls();
 
     return () => {
       clearControlsTimeout();
     };
-  }, [controlsVisible, touchLayout, infoOpen, imageUrl, previousHref, nextHref]);
+  }, [infoOpen]);
 
   async function handleShare() {
     if (typeof navigator === "undefined") {
