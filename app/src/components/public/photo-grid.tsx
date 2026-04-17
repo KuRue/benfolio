@@ -82,6 +82,7 @@ function PhotoTile({
   photo: Photo;
   returnHref?: string;
 }) {
+  const [loaded, setLoaded] = useState(false);
   const href = returnHref
     ? {
         pathname: `/p/${photo.id}`,
@@ -112,7 +113,9 @@ function PhotoTile({
             src={photo.blurDataUrl}
             alt=""
             aria-hidden
-            className="absolute inset-0 h-full w-full object-cover blur-md"
+            className={`absolute inset-0 h-full w-full object-cover blur-md transition-opacity duration-200 ${
+                  loaded ? "opacity-0" : "opacity-100"
+                }`}
           />
         ) : null}
         {photo.gridImageUrl ? (
@@ -120,7 +123,10 @@ function PhotoTile({
             src={photo.gridImageUrl}
             alt={photo.altText ?? photo.title ?? photo.caption ?? "Event photograph"}
             loading="lazy"
-            className="relative z-10 h-full w-full object-cover transition duration-500 group-hover:scale-[1.025] group-hover:saturate-[1.03]"
+            onLoad={() => setLoaded(true)}
+            className={`relative z-10 h-full w-full object-cover transition duration-500 group-hover:scale-[1.025] group-hover:saturate-[1.03] ${
+                  loaded ? "opacity-100" : "opacity-0"
+                }`}
           />
         ) : (
           <div className="absolute inset-0 bg-[linear-gradient(145deg,_rgba(255,255,255,0.06),_rgba(255,255,255,0.02))]" />
