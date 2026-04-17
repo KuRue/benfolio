@@ -49,6 +49,7 @@ export default async function EditEventPage({
         action={formAction}
         initialValues={{
           title: event.title,
+          kicker: event.kicker ?? "",
           slug: event.slug,
           location: event.location ?? "",
           description: event.description ?? "",

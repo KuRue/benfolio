@@ -174,6 +174,7 @@ async function getValidatedEventPayload(
   currentEventId?: string,
 ) {
   const title = asString(formData.get("title"));
+  const kicker = asString(formData.get("kicker")) || null;
   const slugInput = asString(formData.get("slug"));
   const location = asString(formData.get("location")) || null;
   const description = asString(formData.get("description")) || null;
@@ -208,6 +209,7 @@ async function getValidatedEventPayload(
     ok: true as const,
     data: {
       title,
+      kicker,
       slug,
       location,
       description,

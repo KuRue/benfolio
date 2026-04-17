@@ -138,6 +138,7 @@ model SiteProfile {
 
 model Event {
   id              String          @id @default(cuid())
+  kicker          String?
   title           String
   slug            String          @unique
   eventDate       DateTime

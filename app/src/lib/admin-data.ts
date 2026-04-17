@@ -357,6 +357,7 @@ export async function getAdminEventEditorData(
     select: {
       id: true,
       title: true,
+      kicker: true,
       slug: true,
       eventDate: true,
       eventEndDate: true,

@@ -7,6 +7,7 @@ import { buildDisplayUrl } from "@/lib/storage";
 type EventCardProps = {
   event: {
     title: string;
+    kicker: string | null;
     slug: string;
     eventDate: Date;
     eventEndDate: Date | null;
@@ -44,8 +45,13 @@ export function EventCard({ event }: EventCardProps) {
             <span>{event._count.photos} photos</span>
           </div>
           <div className="mt-3 rounded-[1.3rem] border border-white/10 bg-black/24 px-4 py-4 shadow-[0_16px_40px_rgba(0,0,0,0.2)] backdrop-blur-[7px] sm:px-5 sm:py-4.5">
-            <div className="space-y-2">
-              <h2 className="font-serif text-[1.85rem] leading-[0.96] tracking-[-0.03em] text-white sm:text-[2.05rem]">
+            <div className="space-y-1.5">
+              {event.kicker ? (
+                <p className="text-[0.66rem] uppercase tracking-[0.28em] text-white/60 sm:text-[0.7rem]">
+                  {event.kicker}
+                </p>
+              ) : null}
+              <h2 className="text-balance font-serif text-[1.85rem] leading-[1.02] tracking-[-0.03em] text-white sm:text-[2.05rem]">
                 {event.title}
               </h2>
               <p className="text-[0.72rem] uppercase tracking-[0.28em] text-white/52 sm:text-xs">

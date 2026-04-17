@@ -107,7 +107,12 @@ export default async function EventPage({ params }: EventPageProps) {
             ) : null}
             <div className="relative flex min-h-[10rem] flex-col justify-end p-4 sm:min-h-[11.5rem] sm:p-5 lg:min-h-[13rem] lg:p-6">
               <div className="max-w-4xl space-y-2">
-                <h1 className="font-serif text-[2.2rem] leading-none tracking-[-0.045em] text-white sm:text-[2.9rem] lg:text-[3.6rem]">
+                {event.kicker ? (
+                  <p className="text-[0.72rem] uppercase tracking-[0.32em] text-white/60 sm:text-[0.78rem]">
+                    {event.kicker}
+                  </p>
+                ) : null}
+                <h1 className="text-balance font-serif text-[2.2rem] leading-[1.02] tracking-[-0.045em] text-white sm:text-[2.9rem] lg:text-[3.6rem]">
                   {event.title}
                 </h1>
                 <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[0.68rem] uppercase tracking-[0.28em] text-white/56 sm:text-[0.72rem]">

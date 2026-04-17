@@ -14,6 +14,7 @@ type EventFormProps = {
   ) => Promise<EventActionState>;
   initialValues?: {
     title?: string;
+    kicker?: string;
     slug?: string;
     location?: string;
     description?: string;
@@ -62,6 +63,20 @@ export function EventForm({
           {state.fieldErrors?.title ? (
             <span className="text-xs text-[#f3d1aa]">{state.fieldErrors.title}</span>
           ) : null}
+        </label>
+
+        <label className="block space-y-2 lg:col-span-2">
+          <span className="text-sm text-white/68">Series</span>
+          <input
+            name="kicker"
+            defaultValue={initialValues?.kicker}
+            className="admin-input"
+            placeholder="e.g. WCFF 2026"
+          />
+          <span className="text-xs text-white/48">
+            Optional. Shows as a small caption above the title. Use for event
+            series or brand names — leave blank for stand-alone events.
+          </span>
         </label>
 
         <label className="block space-y-2">
