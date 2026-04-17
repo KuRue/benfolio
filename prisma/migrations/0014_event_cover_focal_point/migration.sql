@@ -1,0 +1,3 @@
+ALTER TABLE "Event"
+ADD COLUMN "coverFocalX" INTEGER,
+ADD COLUMN "coverFocalY" INTEGER;

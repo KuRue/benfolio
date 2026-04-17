@@ -179,6 +179,8 @@ async function getValidatedEventPayload(
   const location = asString(formData.get("location")) || null;
   const description = asString(formData.get("description")) || null;
   const visibility = asVisibility(asString(formData.get("visibility")));
+  const coverFocalX = normalizePercent(formData.get("coverFocalX"));
+  const coverFocalY = normalizePercent(formData.get("coverFocalY"));
   const slug = slugify(slugInput || title);
 
   const fieldErrors: EventActionState["fieldErrors"] = {};
@@ -214,6 +216,8 @@ async function getValidatedEventPayload(
       location,
       description,
       visibility,
+      coverFocalX,
+      coverFocalY,
     },
   };
 }

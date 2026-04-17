@@ -6,6 +6,7 @@ import { EventDangerZone } from "@/components/admin/event-danger-zone";
 import { EventForm } from "@/components/admin/event-form";
 import { EventPhotoManager } from "@/components/admin/event-photo-manager";
 import { getAdminEventEditorData, getAdminEventOptions } from "@/lib/admin-data";
+import { buildDisplayUrl } from "@/lib/storage";
 
 type EditEventPageProps = {
   params: Promise<{
@@ -54,7 +55,10 @@ export default async function EditEventPage({
           location: event.location ?? "",
           description: event.description ?? "",
           visibility: event.visibility,
+          coverFocalX: event.coverFocalX ?? 50,
+          coverFocalY: event.coverFocalY ?? 50,
         }}
+        currentCoverUrl={buildDisplayUrl(event.coverDisplayKey)}
       />
 
       <EventPhotoManager

@@ -73,6 +73,7 @@ export default async function EventPage({ params }: EventPageProps) {
   }
 
   const coverUrl = buildDisplayUrl(event.coverDisplayKey);
+  const coverPosition = `${event.coverFocalX ?? 50}% ${event.coverFocalY ?? 50}%`;
 
   return (
     <main className="pb-16 pt-2 sm:pt-3 lg:pt-4">
@@ -84,6 +85,7 @@ export default async function EventPage({ params }: EventPageProps) {
                 src={coverUrl}
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
+                style={{ objectPosition: coverPosition }}
               />
             ) : (
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(197,146,92,0.26),_transparent_32%),linear-gradient(145deg,_#141414,_#070707)]" />

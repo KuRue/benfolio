@@ -367,6 +367,8 @@ export async function getAdminEventEditorData(
       photoOrderMode: true,
       coverOriginalKey: true,
       coverDisplayKey: true,
+      coverFocalX: true,
+      coverFocalY: true,
       _count: {
         select: {
           photos: true,

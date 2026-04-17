@@ -14,6 +14,8 @@ type EventCardProps = {
     location: string | null;
     description: string | null;
     coverDisplayKey: string | null;
+    coverFocalX: number | null;
+    coverFocalY: number | null;
     _count: {
       photos: number;
     };
@@ -22,6 +24,7 @@ type EventCardProps = {
 
 export function EventCard({ event }: EventCardProps) {
   const coverUrl = buildDisplayUrl(event.coverDisplayKey);
+  const coverPosition = `${event.coverFocalX ?? 50}% ${event.coverFocalY ?? 50}%`;
 
   return (
     <Link
@@ -34,6 +37,7 @@ export function EventCard({ event }: EventCardProps) {
             src={coverUrl}
             alt=""
             className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03] group-hover:saturate-[1.03]"
+            style={{ objectPosition: coverPosition }}
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/14 to-transparent" />
