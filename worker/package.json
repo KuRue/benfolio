@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "lint": "tsc --noEmit -p tsconfig.json",
-    "start": "node dist/worker/src/index.js"
+    "start": "node dist/worker/src/index.js",
+    "recover": "node dist/worker/src/recover.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1030.0",

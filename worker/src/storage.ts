@@ -5,6 +5,7 @@ import {
   DeleteObjectsCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -130,6 +131,45 @@ export async function deleteObjects(args: { bucket: string; keys: string[] }) {
       },
     }),
   );
+}
+
+export async function listObjects(args: { bucket: string; prefix: string }) {
+  const { s3 } = await getStorageRuntime();
+  const objects: Array<{
+    key: string;
+    size: number;
+    lastModified: Date | null;
+  }> = [];
+
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: args.bucket,
+        Prefix: args.prefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+
+    for (const object of response.Contents ?? []) {
+      if (!object.Key) {
+        continue;
+      }
+
+      objects.push({
+        key: object.Key,
+        size: object.Size ?? 0,
+        lastModified: object.LastModified ?? null,
+      });
+    }
+
+    continuationToken = response.IsTruncated
+      ? response.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+
+  return objects;
 }
 
 export async function uploadObject(args: {

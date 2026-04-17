@@ -6,8 +6,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-gallery}
       POSTGRES_USER: ${POSTGRES_USER:-gallery}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    # Bind mount onto the host filesystem instead of a Docker-managed named
+    # volume. Two reasons:
+    #   1. Named volumes under /var/lib/docker/volumes get wiped when the
+    #      Docker vdisk is rebuilt (common on Unraid) and when compose
+    #      managers run `down -v` on "update". A host path survives both.
+    #   2. Appdata backup tools (Unraid CA Backup, restic targeting
+    #      /mnt/user/appdata, etc.) pick up host paths automatically.
+    # Set BENFOLIO_DATA_DIR to the parent appdata dir, e.g.
+    # BENFOLIO_DATA_DIR=/mnt/user/appdata/benfolio
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ${BENFOLIO_DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gallery} -d ${POSTGRES_DB:-gallery}"]
       interval: 5s
@@ -18,7 +27,7 @@ services:
     image: redis:8-alpine
     restart: unless-stopped
     volumes:
-      - redis-data:/data
+      - ${BENFOLIO_DATA_DIR:-./data}/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -87,6 +96,3 @@ services:
       DATABASE_URL: ${SERVER_DATABASE_URL:-postgresql://gallery:change-me@db:5432/gallery?schema=public}
       REDIS_URL: ${SERVER_REDIS_URL:-redis://redis:6379}
 
-volumes:
-  postgres-data:
-  redis-data:
