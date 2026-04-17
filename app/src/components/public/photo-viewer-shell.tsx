@@ -21,7 +21,6 @@ type PhotoViewerShellProps = {
     nextImageUrl: string | null;
     originalFilename: string;
     downloadsEnabled: boolean;
-    blurDataUrl: string | null;
     width: number | null;
     height: number | null;
     cameraMake: string | null;
@@ -124,7 +123,6 @@ export function PhotoViewerShell({
       subtitle={subtitle ?? ""}
       eventHref={viewer.eventHref}
       downloadHref={viewer.downloadsEnabled ? `/download/${viewer.id}` : null}
-      blurDataUrl={viewer.blurDataUrl}
       previousHref={withReturnHref(viewer.previousHref, normalizedReturnHref)}
       nextHref={withReturnHref(viewer.nextHref, normalizedReturnHref)}
       closeHref={normalizedReturnHref ?? (!isModal ? viewer.eventHref : undefined)}

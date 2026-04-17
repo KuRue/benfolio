@@ -40,7 +40,7 @@ type PhotoViewerClientProps = {
   title: string;
   subtitle: string;
   eventHref: string;
-  downloadHref: string;
+  downloadHref: string | null;
   previousHref: string | null;
   nextHref: string | null;
   closeHref?: string;
@@ -466,13 +466,15 @@ export function PhotoViewerClient({
                 >
                   <Link2 size={18} />
                 </button>
-                <a
-                  href={downloadHref}
-                  className={viewerActionClass()}
-                  aria-label="Download original"
-                >
-                  <Download size={18} />
-                </a>
+                {downloadHref ? (
+                  <a
+                    href={downloadHref}
+                    className={viewerActionClass()}
+                    aria-label="Download original"
+                  >
+                    <Download size={18} />
+                  </a>
+                ) : null}
               </div>
             </div>
 
