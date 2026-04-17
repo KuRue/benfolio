@@ -6,6 +6,7 @@ import { Redis } from "ioredis";
 import sharp from "sharp";
 
 import { Prisma } from "../../prisma/generated/client/client.ts";
+import { applyPendingMigrations } from "./bootstrap-migrations.js";
 import { env } from "./env.js";
 import {
   handleImportedPhotoFailed,
@@ -15,6 +16,11 @@ import {
 import { inferPhotoMimeType, isRawPhotoFile } from "./photo-files.js";
 import { prisma } from "./prisma.js";
 import { getStorageBuckets, readObject, uploadObject } from "./storage.js";
+
+// Run pending migrations before opening the Redis connection or touching the
+// database. If this fails we exit loudly — starting BullMQ against a
+// half-migrated schema is the bug we're trying to prevent.
+await applyPendingMigrations();
 
 const PHOTO_PROCESSING_QUEUE = "photo-processing";
 const IMPORT_PROCESSING_QUEUE = "import-processing";

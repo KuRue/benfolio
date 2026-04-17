@@ -23,6 +23,10 @@ WORKDIR /workspace
 
 COPY --from=production-deps --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/worker/dist ./worker/dist
+# Ship the prisma CLI entry points, schema, and migrations so the worker can
+# run `prisma migrate deploy` at startup before BullMQ consumers come up.
+COPY --from=build --chown=node:node /workspace/prisma ./prisma
+COPY --from=build --chown=node:node /workspace/prisma.config.ts ./prisma.config.ts
 
 USER node
 
