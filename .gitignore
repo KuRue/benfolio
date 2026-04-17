@@ -2,6 +2,7 @@ node_modules
 package-lock.json
 app/.next
 app/out
+.next
 worker/dist
 .env
 .env.local
@@ -10,3 +11,4 @@ coverage
 .DS_Store
 *.log
 prisma/generated
+.claude

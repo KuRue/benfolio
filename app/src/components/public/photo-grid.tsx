@@ -12,6 +12,8 @@ type Photo = {
   gridImageUrl: string | null;
   gridWidth: number;
   gridHeight: number;
+  blurDataUrl?: string | null;
+  dominantColor?: string | null;
 };
 
 type PhotoGridProps = {
@@ -101,12 +103,24 @@ function PhotoTile({
       style={{ aspectRatio: ratio }}
       className="group relative block overflow-hidden rounded-[1.05rem] border border-white/8 bg-white/4 shadow-[0_16px_42px_rgba(0,0,0,0.18)] transition duration-300 hover:-translate-y-0.5 hover:border-white/14 hover:shadow-[0_22px_60px_rgba(0,0,0,0.24)]"
     >
-      <div className="relative h-full w-full overflow-hidden bg-[#0c0c0c]">
+      <div
+        className="relative h-full w-full overflow-hidden"
+        style={{ backgroundColor: photo.dominantColor ?? "#0c0c0c" }}
+      >
+        {photo.blurDataUrl ? (
+          <img
+            src={photo.blurDataUrl}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full object-cover blur-md"
+          />
+        ) : null}
         {photo.gridImageUrl ? (
           <img
             src={photo.gridImageUrl}
             alt={photo.altText ?? photo.title ?? photo.caption ?? "Event photograph"}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025] group-hover:saturate-[1.03]"
+            loading="lazy"
+            className="relative z-10 h-full w-full object-cover transition duration-500 group-hover:scale-[1.025] group-hover:saturate-[1.03]"
           />
         ) : (
           <div className="absolute inset-0 bg-[linear-gradient(145deg,_rgba(255,255,255,0.06),_rgba(255,255,255,0.02))]" />
