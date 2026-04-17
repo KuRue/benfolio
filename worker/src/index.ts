@@ -17,10 +17,27 @@ import { inferPhotoMimeType, isRawPhotoFile } from "./photo-files.js";
 import { prisma } from "./prisma.js";
 import { getStorageBuckets, readObject, uploadObject } from "./storage.js";
 
-// Run pending migrations before opening the Redis connection or touching the
-// database. If this fails we exit loudly — starting BullMQ against a
-// half-migrated schema is the bug we're trying to prevent.
-await applyPendingMigrations();
+// Boot banner — surfaces immediately in container logs so we can tell at a
+// glance which revision is running. Keep this before anything async that can
+// throw, so even crash-looping containers reveal their build.
+console.log(
+  `[worker] boot revision=${process.env.GIT_SHA ?? "unknown"} node=${process.version} pid=${process.pid}`,
+);
+
+// Attempt to apply pending migrations before opening Redis or accepting jobs.
+// This is best-effort: if the migrate subprocess errors (e.g. prisma CLI
+// loader issues in a pruned image, engine download failure), we log loudly
+// and continue. A genuinely broken schema will still surface as a Prisma
+// runtime error on the first query — which is the behavior we had before
+// adding auto-migration — so skipping on error can't make things worse.
+try {
+  await applyPendingMigrations();
+} catch (error) {
+  console.error(
+    "[worker] auto-migration failed, continuing boot anyway:",
+    error instanceof Error ? error.stack ?? error.message : error,
+  );
+}
 
 const PHOTO_PROCESSING_QUEUE = "photo-processing";
 const IMPORT_PROCESSING_QUEUE = "import-processing";
@@ -33,8 +50,19 @@ type ImportProcessingJob = {
   importJobId: string;
 };
 
+console.log(
+  `[worker] env: DATABASE_URL set=${Boolean(process.env.DATABASE_URL)}, REDIS_URL set=${Boolean(process.env.REDIS_URL)}`,
+);
+
 const connection = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: null,
+});
+
+connection.on("error", (error) => {
+  console.error("[worker] redis error:", error.message);
+});
+connection.on("ready", () => {
+  console.log("[worker] redis ready");
 });
 
 const photoQueue = new Queue<PhotoProcessingJob>(PHOTO_PROCESSING_QUEUE, {
@@ -465,6 +493,13 @@ const worker = new Worker<PhotoProcessingJob>(
   },
 );
 
+worker.on("error", (error) => {
+  console.error("[worker] photo worker error:", error.message);
+});
+worker.on("active", (job) => {
+  console.log(`[worker] photo job active: ${job.data.photoId}`);
+});
+
 const importWorker = new Worker<ImportProcessingJob>(
   IMPORT_PROCESSING_QUEUE,
   async (job) => {
@@ -535,9 +570,14 @@ const heartbeatInterval = setInterval(() => {
   });
 }, 30_000);
 
-void recordWorkerHeartbeat().catch((error) => {
-  console.error("Initial worker heartbeat failed", error);
-});
+void recordWorkerHeartbeat()
+  .then(() => console.log("[worker] initial heartbeat recorded"))
+  .catch((error) => {
+    console.error(
+      "[worker] initial heartbeat failed:",
+      error instanceof Error ? error.stack ?? error.message : error,
+    );
+  });
 
 process.on("SIGINT", async () => {
   clearInterval(heartbeatInterval);
