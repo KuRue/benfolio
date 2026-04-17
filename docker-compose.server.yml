@@ -25,6 +25,27 @@ services:
       timeout: 5s
       retries: 20
 
+  # One-shot init service. Runs `prisma migrate deploy` before web/worker
+  # start, so schema changes apply automatically on every `docker compose up`.
+  # The container exits 0 when migrations are up to date (safe to re-run),
+  # and the web/worker services wait for it via service_completed_successfully.
+  # If the migration fails, web/worker never start — which is what you want,
+  # rather than letting them serve against a mismatched schema.
+  migrate:
+    image: ghcr.io/kurue/benfolio-web:${BENFOLIO_IMAGE_TAG:-latest}
+    pull_policy: always
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${SERVER_DATABASE_URL:-postgresql://gallery:change-me@db:5432/gallery?schema=public}
+    working_dir: /migrate
+    command: ["node_modules/.bin/prisma", "migrate", "deploy", "--config", "./prisma.config.ts"]
+
   web:
     image: ghcr.io/kurue/benfolio-web:${BENFOLIO_IMAGE_TAG:-latest}
     pull_policy: always
@@ -34,6 +55,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "3000:3000"
     env_file:
@@ -55,6 +78,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
