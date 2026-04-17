@@ -10,6 +10,7 @@ import {
   normalizeImportAdminFilters,
   parseStorageImportPayload,
 } from "@/lib/imports";
+import { formatDateRange } from "@/lib/strings";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveTakenAt } from "@/lib/photo-order";
 import { buildDisplayUrl } from "@/lib/storage";
@@ -196,6 +197,13 @@ function photoMatchesAsset(
   );
 }
 
+function formatEventDateLabel(
+  eventDate: Date,
+  eventEndDate: Date | null | undefined,
+) {
+  return formatDateRange(eventDate, eventEndDate, "short");
+}
+
 export async function getAdminDashboardData() {
   const [eventsByVisibility, recentEvents, photoCount, importJobCount] = await Promise.all([
     prisma.event.groupBy({
@@ -236,7 +244,7 @@ export async function getAdminDashboardData() {
 }
 
 export async function getAdminEventList() {
-  return prisma.event.findMany({
+  const events = await prisma.event.findMany({
     orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
     include: {
       _count: {
@@ -246,19 +254,30 @@ export async function getAdminEventList() {
       },
     },
   });
+
+  return events.map((event) => ({
+    ...event,
+    eventDateLabel: formatEventDateLabel(event.eventDate, event.eventEndDate),
+  }));
 }
 
 export async function getAdminEventOptions() {
-  return prisma.event.findMany({
+  const events = await prisma.event.findMany({
     orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
     select: {
       id: true,
       title: true,
       slug: true,
       eventDate: true,
+      eventEndDate: true,
       visibility: true,
     },
   });
+
+  return events.map((event) => ({
+    ...event,
+    eventDateLabel: formatEventDateLabel(event.eventDate, event.eventEndDate),
+  }));
 }
 
 export async function getAdminEventById(eventId: string) {
@@ -340,6 +359,7 @@ export async function getAdminEventEditorData(
       title: true,
       slug: true,
       eventDate: true,
+      eventEndDate: true,
       location: true,
       description: true,
       visibility: true,
@@ -407,6 +427,7 @@ export async function getAdminEventEditorData(
 
   return {
     ...event,
+    eventDateLabel: formatEventDateLabel(event.eventDate, event.eventEndDate),
     filters: {
       ...normalizedFilters,
       page,
@@ -475,6 +496,7 @@ export async function getAdminSiteProfileData() {
             title: true,
             slug: true,
             eventDate: true,
+            eventEndDate: true,
           },
         },
         derivatives: {
@@ -501,6 +523,7 @@ export async function getAdminSiteProfileData() {
         caption: photo.caption,
         altText: photo.altText,
         event: photo.event,
+        eventDateLabel: formatEventDateLabel(photo.event.eventDate, photo.event.eventEndDate),
         previewUrl: buildDisplayUrl(preview?.storageKey),
         previewWidth: preview?.width ?? photo.width ?? 1200,
         previewHeight: preview?.height ?? photo.height ?? 1500,

@@ -50,7 +50,6 @@ export default async function EditEventPage({
         initialValues={{
           title: event.title,
           slug: event.slug,
-          eventDate: event.eventDate.toISOString().slice(0, 10),
           location: event.location ?? "",
           description: event.description ?? "",
           visibility: event.visibility,
@@ -83,7 +82,7 @@ export default async function EditEventPage({
             title: candidate.title,
             slug: candidate.slug,
             visibility: candidate.visibility,
-            eventDate: candidate.eventDate?.toISOString() ?? null,
+            eventDateLabel: candidate.eventDateLabel,
           }))}
         photos={event.photos.map((photo) => ({
           id: photo.id,

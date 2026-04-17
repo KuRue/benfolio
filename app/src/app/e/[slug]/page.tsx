@@ -6,8 +6,9 @@ import { notFound } from "next/navigation";
 import { PhotoGrid } from "@/components/public/photo-grid";
 import { PublicSiteMark } from "@/components/public/public-site-mark";
 import { PublicPhotoSearchLauncher } from "@/components/public/public-photo-search-launcher";
+import { getResolvedRuntimeSettings } from "@/lib/app-settings";
 import { getPublicEventBySlug, getSiteProfile } from "@/lib/gallery";
-import { absoluteUrl, formatLongDate } from "@/lib/strings";
+import { absoluteUrl, formatDateRange } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,8 @@ export async function generateMetadata({
   return {
     title: event.title,
     description:
-      event.description ?? `A curated event gallery from ${formatLongDate(event.eventDate)}.`,
+      event.description ??
+      `A curated event gallery from ${formatDateRange(event.eventDate, event.eventEndDate)}.`,
     alternates: {
       canonical: `/e/${event.slug}`,
     },
@@ -51,7 +53,7 @@ export async function generateMetadata({
       title: event.title,
       description:
         event.description ??
-        `A curated event gallery from ${formatLongDate(event.eventDate)}.`,
+        `A curated event gallery from ${formatDateRange(event.eventDate, event.eventEndDate)}.`,
       url: absoluteUrl(`/e/${event.slug}`),
       images: image ? [{ url: absoluteUrl(image) }] : undefined,
     },
@@ -60,9 +62,10 @@ export async function generateMetadata({
 
 export default async function EventPage({ params }: EventPageProps) {
   const { slug } = await params;
-  const [event, siteProfile] = await Promise.all([
+  const [event, siteProfile, runtimeSettings] = await Promise.all([
     getPublicEventBySlug(slug),
     getSiteProfile(),
+    getResolvedRuntimeSettings(),
   ]);
 
   if (!event) {
@@ -87,24 +90,28 @@ export default async function EventPage({ params }: EventPageProps) {
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_34%,_rgba(0,0,0,0.18)_100%)]" />
-            <div className="absolute left-3 top-3 z-10 sm:left-4 sm:top-4">
-              <PublicSiteMark
-                displayName={siteProfile.displayName}
-                logoDisplayKey={siteProfile.logoDisplayKey}
-              />
-            </div>
-            <div className="absolute right-3 top-3 z-10 sm:right-4 sm:top-4">
-              <PublicPhotoSearchLauncher
-                triggerClassName="floating-action inline-flex h-11 w-11 items-center justify-center text-white/68 transition hover:bg-white/10 hover:text-white"
-              />
-            </div>
+            {runtimeSettings.logoMarkEnabled ? (
+              <div className="absolute left-3 top-3 z-10 sm:left-4 sm:top-4">
+                <PublicSiteMark
+                  displayName={siteProfile.displayName}
+                  logoDisplayKey={siteProfile.logoDisplayKey}
+                />
+              </div>
+            ) : null}
+            {runtimeSettings.publicSearchEnabled ? (
+              <div className="absolute right-3 top-3 z-10 sm:right-4 sm:top-4">
+                <PublicPhotoSearchLauncher
+                  triggerClassName="floating-action inline-flex h-11 w-11 items-center justify-center text-white/68 transition hover:bg-white/10 hover:text-white"
+                />
+              </div>
+            ) : null}
             <div className="relative flex min-h-[10rem] flex-col justify-end p-4 sm:min-h-[11.5rem] sm:p-5 lg:min-h-[13rem] lg:p-6">
               <div className="max-w-4xl space-y-2">
                 <h1 className="font-serif text-[2.2rem] leading-none tracking-[-0.045em] text-white sm:text-[2.9rem] lg:text-[3.6rem]">
                   {event.title}
                 </h1>
                 <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[0.68rem] uppercase tracking-[0.28em] text-white/56 sm:text-[0.72rem]">
-                  <span>{formatLongDate(event.eventDate)}</span>
+                  <span>{formatDateRange(event.eventDate, event.eventEndDate)}</span>
                   {event.location ? <span>{event.location}</span> : null}
                   <span>{event.photos.length} photo{event.photos.length === 1 ? "" : "s"}</span>
                 </div>

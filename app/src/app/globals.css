@@ -279,6 +279,8 @@ body {
 }
 
 .admin-select {
+  appearance: none;
+  background-color: #0b0b0b;
   color-scheme: dark;
 }
 

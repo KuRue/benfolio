@@ -38,7 +38,7 @@ export default async function AdminEventsPage() {
               </div>
               <div className="text-right text-sm text-white/54">
                 <p>{event._count.photos} photos</p>
-                <p>{event.eventDate.toISOString().slice(0, 10)}</p>
+                <p>{event.eventDateLabel}</p>
               </div>
             </div>
           </Link>

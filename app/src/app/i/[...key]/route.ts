@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { readObject, storageBuckets } from "@/lib/storage";
+import { getStorageBuckets, readObject } from "@/lib/storage";
 
 type ImageRouteProps = {
   params: Promise<{
@@ -12,8 +12,9 @@ export async function GET(_request: NextRequest, { params }: ImageRouteProps) {
   const { key } = await params;
 
   try {
+    const buckets = await getStorageBuckets();
     const object = await readObject({
-      bucket: storageBuckets.derivatives,
+      bucket: buckets.derivatives,
       key: key.join("/"),
     });
 

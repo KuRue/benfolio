@@ -31,6 +31,34 @@ function getRedisConnection() {
   );
 }
 
+export async function getRedisPing() {
+  return getRedisConnection().ping();
+}
+
+export async function getQueueBacklogCounts() {
+  const [photoCounts, importCounts] = await Promise.all([
+    getPhotoQueue().getJobCounts(
+      "waiting",
+      "active",
+      "delayed",
+      "failed",
+      "completed",
+    ),
+    getImportQueue().getJobCounts(
+      "waiting",
+      "active",
+      "delayed",
+      "failed",
+      "completed",
+    ),
+  ]);
+
+  return {
+    photos: photoCounts,
+    imports: importCounts,
+  };
+}
+
 export function getPhotoQueue() {
   if (!globalForQueue.__galleryPhotoQueue) {
     globalForQueue.__galleryRedis = getRedisConnection();

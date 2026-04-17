@@ -8,6 +8,7 @@ This repository contains a production-leaning first pass of a self-hosted event 
 - Redis-backed background jobs
 - a separate worker service in the same repo
 - S3-compatible object storage wired for Cloudflare R2 in production and MinIO locally
+- a setup-first admin control center for storage behavior, imports, public toggles, and diagnostics
 
 ## Repo layout
 
@@ -103,24 +104,27 @@ In practice that usually means either:
 
 Copy `.env.example` to `.env`.
 
-Required for a real deployment:
+Bootstrap env you must set:
 
 - `APP_URL`
 - `AUTH_COOKIE_SECRET`
-- `S3_ENDPOINT`
-- `S3_PUBLIC_ENDPOINT`
 - `S3_ACCESS_KEY_ID`
 - `S3_SECRET_ACCESS_KEY`
-- `S3_BUCKET_ORIGINALS`
-- `S3_BUCKET_DERIVATIVES`
 
-Usually leave as-is unless you have a reason to change them:
+Usually set here for the first deploy, but editable later in `/admin/settings`:
 
+- `S3_ENDPOINT`
+- `S3_PUBLIC_ENDPOINT`
 - `S3_REGION`
 - `S3_FORCE_PATH_STYLE`
+- `S3_BUCKET_ORIGINALS`
+- `S3_BUCKET_DERIVATIVES`
 - `IMPORTS_PREFIX`
 - `IMPORTS_CLEANUP_MODE`
 - `IMPORTS_ARCHIVE_PREFIX`
+
+Safe to leave at the example defaults until you reach the admin checklist:
+
 - `STORAGE_WEBHOOK_SIGNATURE_HEADER`
 
 Optional and safe to leave blank or unset:
@@ -168,6 +172,19 @@ Open the app at `http://<server>:3000`.
 - If `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` were set during init, sign in with that account.
 - If they were left blank, visit `/admin/bootstrap` once to create the first admin.
 
+### 6. Finish setup from admin
+
+After the first login, `/admin` now surfaces a compact setup checklist and system status.
+Use `/admin/settings` to:
+
+- set the public site identity
+- verify storage and bucket access with **Test storage**
+- adjust storage endpoints, bucket names, imports behavior, and gallery toggles
+- confirm worker heartbeat and queue health
+
+The worker and app still depend on env-managed credentials in this phase. The admin
+settings layer controls non-secret storage behavior and product toggles on top of that.
+
 `docker-compose.server.yml` intentionally maps runtime `DATABASE_URL` and `REDIS_URL`
 from `SERVER_DATABASE_URL` and `SERVER_REDIS_URL` so the repository's existing
 `.env.example` can keep shell-friendly localhost defaults without breaking container-to-container
@@ -204,6 +221,31 @@ docker compose -f docker-compose.server.yml -f docker-compose.server.init.yml ru
 ## Environment
 
 Core env vars are documented in `.env.example`.
+
+### Bootstrap env
+
+Keep these in env:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `AUTH_COOKIE_SECRET`
+- `S3_ACCESS_KEY_ID`
+- `S3_SECRET_ACCESS_KEY`
+
+### Admin-managed after bootstrap
+
+These still have env fallbacks, but benfolio now lets you manage them from
+`/admin/settings` after the first deploy:
+
+- storage endpoint / public endpoint / region / path-style mode
+- originals and derivatives bucket names
+- imports prefix / cleanup mode / archive prefix
+- public search enabled
+- original downloads enabled
+- public indexing enabled
+- default event visibility
+- direct admin uploads enabled
+- public logo mark enabled
 
 For local Docker, Compose already injects working defaults. For production, point the S3-compatible settings to Cloudflare R2:
 
@@ -263,6 +305,20 @@ If uploads fail, open devtools → Network, retry, and inspect the failing `PUT`
 the `OPTIONS` preflight. The console will also log the target URL and any response body
 the storage layer returned.
 
+## Setup checklist and diagnostics
+
+The admin overview and settings pages now expose:
+
+- a first-run checklist
+- storage connectivity checks
+- Redis / database / bucket reachability
+- worker heartbeat freshness
+- queue backlog counts
+- failed photo and import counts
+- latest successful processing/import timestamps
+
+If the worker stops, the heartbeat will go stale and admin will surface that directly.
+
 ## Database and Prisma
 
 Common commands:
@@ -305,6 +361,7 @@ Seed behavior:
 - Derivatives are served through the app from the derivatives bucket for a simpler first-pass delivery path.
 - Storage webhooks are supported, but signature verification is optional so local Docker testing stays easy. Leaving `STORAGE_WEBHOOK_SECRET` empty accepts unsigned JSON deliveries from a trusted network.
 - Import dedupe is still keyed to the source object key. That keeps webhook and manual scan idempotent, but the model does not attempt content-hash dedupe across renamed files.
+- Storage credentials are still env-managed. The control center only manages non-secret storage behavior in this phase.
 
 ## Testing webhook ingestion locally
 
@@ -369,6 +426,33 @@ curl -X POST 'http://localhost:3000/api/webhooks/storage?adapter=cloudflare-r2' 
 ```
 
 This shape is intended for an R2 queue consumer or small relay worker that forwards object-create events to the app while preserving the object key, provider metadata, and any request identifier.
+
+## Operator troubleshooting
+
+### Storage connection failed
+
+- Check `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`
+- Confirm the endpoint and bucket names in `/admin/settings`
+- Use **Test storage** from `/admin/settings`
+
+### Worker not processing
+
+- Open `/admin` or `/admin/settings` and check the worker heartbeat
+- Confirm Redis is reachable
+- Check the queue counts and failed photo count
+
+### Imports not appearing
+
+- Confirm the imports prefix in `/admin/settings`
+- Check `/admin/imports` for skipped or failed items
+- Use the manual scan button as the fallback even when webhooks are enabled
+
+### Direct uploads failing
+
+- Confirm direct uploads are enabled in `/admin/settings`
+- Check the browser-facing `S3_PUBLIC_ENDPOINT`
+- Verify bucket CORS matches your `APP_URL`
+- If uploads verify but do not process, check the worker heartbeat and queue counts
 
 ## Verification run
 

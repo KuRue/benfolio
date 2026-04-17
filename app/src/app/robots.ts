@@ -1,16 +1,27 @@
 import type { MetadataRoute } from "next";
 
-export default function robots(): MetadataRoute.Robots {
-  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+import { getResolvedRuntimeSettings } from "@/lib/app-settings";
+
+export const dynamic = "force-dynamic";
+
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const settings = await getResolvedRuntimeSettings();
 
   return {
     rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-        disallow: ["/admin", "/api/admin"],
-      },
+      settings.allowPublicIndexing
+        ? {
+            userAgent: "*",
+            allow: "/",
+            disallow: ["/admin", "/api/admin"],
+          }
+        : {
+            userAgent: "*",
+            disallow: ["/"],
+          },
     ],
-    sitemap: `${appUrl}/sitemap.xml`,
+    sitemap: settings.allowPublicIndexing
+      ? `${settings.appUrl}/sitemap.xml`
+      : undefined,
   };
 }

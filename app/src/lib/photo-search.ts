@@ -2,9 +2,10 @@ import "server-only";
 
 import type { Prisma } from "../../../prisma/generated/client/client";
 
+import { getResolvedRuntimeSettings } from "@/lib/app-settings";
 import { getEffectiveTakenAt } from "@/lib/photo-order";
 import { prisma } from "@/lib/prisma";
-import { formatShortDate } from "@/lib/strings";
+import { formatDateRange, formatShortDate } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
 import { getTagCategoryLabel, normalizeTagName, type TagCategoryValue } from "@/lib/tags";
 
@@ -26,6 +27,7 @@ type SearchCandidate = {
     title: string;
     slug: string;
     eventDate: Date;
+    eventEndDate: Date | null;
   };
   derivatives: Array<{
     kind: string;
@@ -116,10 +118,20 @@ function buildYearClauses(term: string): Prisma.PhotoWhereInput[] {
     {
       event: {
         is: {
-          eventDate: {
-            gte: start,
-            lt: end,
-          },
+          OR: [
+            {
+              eventDate: {
+                gte: start,
+                lt: end,
+              },
+            },
+            {
+              eventEndDate: {
+                gte: start,
+                lt: end,
+              },
+            },
+          ],
         },
       },
     },
@@ -299,6 +311,7 @@ function getMatchedTagSummary(tags: SearchResultTag[]) {
 
 function scoreCandidate(candidate: SearchCandidate, terms: string[]) {
   const eventYear = getDateYear(candidate.event.eventDate);
+  const eventEndYear = getDateYear(candidate.event.eventEndDate);
   const effectiveTakenAt = getEffectiveTakenAt(candidate);
   const effectiveYear = getDateYear(effectiveTakenAt);
   const matchedTags = getMatchedTags(candidate, terms);
@@ -326,7 +339,7 @@ function scoreCandidate(candidate: SearchCandidate, terms: string[]) {
       bestScore = Math.max(bestScore, 72);
     }
 
-    if (term === eventYear || term === effectiveYear) {
+    if (term === eventYear || term === eventEndYear || term === effectiveYear) {
       bestScore = Math.max(bestScore, 88);
     }
 
@@ -382,7 +395,11 @@ function toSearchResult(candidate: SearchCandidate, terms: string[]): PublicPhot
       title: candidate.event.title,
       slug: candidate.event.slug,
       href: `/e/${candidate.event.slug}`,
-      eventDateLabel: formatShortDate(candidate.event.eventDate),
+      eventDateLabel: formatDateRange(
+        candidate.event.eventDate,
+        candidate.event.eventEndDate,
+        "short",
+      ),
     },
     effectiveTakenAtLabel: effectiveTakenAt ? formatShortDate(effectiveTakenAt) : null,
     matchedTags,
@@ -391,9 +408,10 @@ function toSearchResult(candidate: SearchCandidate, terms: string[]): PublicPhot
 }
 
 export async function searchPublicPhotos(args: { query: string; limit?: number }) {
+  const runtimeSettings = await getResolvedRuntimeSettings();
   const terms = tokenizeSearchQuery(args.query);
 
-  if (!terms.length) {
+  if (!runtimeSettings.publicSearchEnabled || !terms.length) {
     return [];
   }
 
@@ -409,6 +427,7 @@ export async function searchPublicPhotos(args: { query: string; limit?: number }
           title: true,
           slug: true,
           eventDate: true,
+          eventEndDate: true,
         },
       },
       derivatives: {

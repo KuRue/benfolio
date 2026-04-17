@@ -10,7 +10,6 @@ const prepareUploadSchema = z
     eventId: z.string().trim().optional(),
     title: z.string().trim().optional(),
     slug: z.string().trim().optional(),
-    eventDate: z.string().trim().optional(),
     location: z.string().trim().optional(),
     description: z.string().trim().optional(),
     visibility: z.enum(["DRAFT", "HIDDEN", "PUBLIC"]).optional(),
@@ -41,14 +40,6 @@ const prepareUploadSchema = z
           code: "custom",
           message: "New uploads need an event title.",
           path: ["title"],
-        });
-      }
-
-      if (!value.eventDate?.trim()) {
-        context.addIssue({
-          code: "custom",
-          message: "New uploads need an event date.",
-          path: ["eventDate"],
         });
       }
     }

@@ -2,14 +2,17 @@ import "server-only";
 
 import { z } from "zod";
 
+import { getResolvedRuntimeSettings } from "@/lib/app-settings";
 import { generatePhotoId } from "@/lib/ids";
+import { syncEventPhotoOrder } from "@/lib/admin-photo-operations";
+import { inferPhotoMimeType } from "@/lib/photo-files";
 import { enqueuePhotoProcessing } from "@/lib/queue";
 import { prisma } from "@/lib/prisma";
 import {
   extensionFromFilename,
+  getStorageBuckets,
   headObject,
   presignUploadObject,
-  storageBuckets,
 } from "@/lib/storage";
 import { slugify } from "@/lib/strings";
 
@@ -84,7 +87,6 @@ async function resolveUploadEvent(args:
       mode: "create";
       title: string;
       slug: string;
-      eventDate: string;
       location: string;
       description: string;
       visibility: EventVisibilityValue;
@@ -107,11 +109,9 @@ async function resolveUploadEvent(args:
 
   const title = normalizeText(args.title);
   const slug = slugify(normalizeText(args.slug) || title);
-  const eventDateInput = normalizeText(args.eventDate);
-  const eventDate = eventDateInput ? new Date(eventDateInput) : null;
 
-  if (!title || !slug || !eventDate || Number.isNaN(eventDate.getTime())) {
-    throw new Error("New events require a title, slug, and event date.");
+  if (!title || !slug) {
+    throw new Error("New events require a title and slug.");
   }
 
   if (await slugIsTaken(slug)) {
@@ -122,7 +122,8 @@ async function resolveUploadEvent(args:
     data: {
       title,
       slug,
-      eventDate,
+      eventDate: new Date(),
+      eventEndDate: null,
       location: normalizeText(args.location) || null,
       description: normalizeText(args.description) || null,
       visibility: args.visibility,
@@ -161,12 +162,17 @@ export async function prepareDirectUploadSession(args: {
   eventId?: string;
   title?: string;
   slug?: string;
-  eventDate?: string;
   location?: string;
   description?: string;
   visibility?: EventVisibilityValue;
   files: PrepareUploadFile[];
 }) {
+  const runtimeSettings = await getResolvedRuntimeSettings();
+
+  if (!runtimeSettings.directUploadEnabled) {
+    throw new Error("Direct uploads are disabled in settings.");
+  }
+
   const files = dedupeUploadFiles(args.files).filter((file) => file.size > 0);
 
   if (!files.length) {
@@ -183,11 +189,11 @@ export async function prepareDirectUploadSession(args: {
           mode: "create",
           title: normalizeText(args.title),
           slug: normalizeText(args.slug),
-          eventDate: normalizeText(args.eventDate),
           location: normalizeText(args.location),
           description: normalizeText(args.description),
-          visibility: args.visibility ?? "DRAFT",
+          visibility: args.visibility ?? runtimeSettings.defaultEventVisibility,
         });
+  const buckets = await getStorageBuckets();
 
   const importJob = await prisma.importJob.create({
     data: {
@@ -205,10 +211,10 @@ export async function prepareDirectUploadSession(args: {
     const preparedFiles = await Promise.all(
       files.map(async (file) => {
         const photoId = generatePhotoId();
-        const originalMimeType = normalizeText(file.type) || "application/octet-stream";
+        const originalMimeType = inferPhotoMimeType(file.name, file.type);
         const originalKey = `events/${event.id}/photos/${photoId}/original.${extensionFromFilename(file.name)}`;
         const upload = await presignUploadObject({
-          bucket: storageBuckets.originals,
+          bucket: buckets.originals,
           key: originalKey,
           contentType: originalMimeType,
         });
@@ -280,6 +286,7 @@ export async function completeDirectUploadSession(args: {
   uploadedClientIds: string[];
   failedUploads: FailedUpload[];
 }) {
+  const buckets = await getStorageBuckets();
   const importJob = await prisma.importJob.findUnique({
     where: {
       id: args.importJobId,
@@ -351,7 +358,7 @@ export async function completeDirectUploadSession(args: {
   for (const file of requestedFiles) {
     try {
       const object = await headObject({
-        bucket: storageBuckets.originals,
+        bucket: buckets.originals,
         key: file.originalKey,
       });
 
@@ -399,6 +406,8 @@ export async function completeDirectUploadSession(args: {
         }),
       ),
     );
+
+    await syncEventPhotoOrder(payload.eventId);
 
     await Promise.all(
       readyToCreate.map((file) => enqueuePhotoProcessing(file.photoId)),

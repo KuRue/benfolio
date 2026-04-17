@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getPhotoDownloadData } from "@/lib/gallery";
-import { readObject, storageBuckets } from "@/lib/storage";
+import { inferPhotoMimeType } from "@/lib/photo-files";
+import { getStorageBuckets, readObject } from "@/lib/storage";
 
 type DownloadRouteProps = {
   params: Promise<{
@@ -16,15 +17,19 @@ export async function GET(_request: Request, { params }: DownloadRouteProps) {
   if (!photo || photo.event.visibility === "DRAFT") {
     return new NextResponse("Not found", { status: 404 });
   }
+  const buckets = await getStorageBuckets();
 
   const object = await readObject({
-    bucket: storageBuckets.originals,
+    bucket: buckets.originals,
     key: photo.originalKey,
   });
 
   return new NextResponse(object.body, {
     headers: {
-      "content-type": photo.originalMimeType,
+      "content-type": inferPhotoMimeType(
+        photo.originalFilename,
+        photo.originalMimeType,
+      ),
       "content-disposition": `attachment; filename="${encodeURIComponent(
         photo.originalFilename,
       )}"`,

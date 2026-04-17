@@ -5,8 +5,6 @@ import { startTransition, useDeferredValue, useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { formatShortDate } from "@/lib/strings";
-
 type SiteProfilePhotoLibraryProps = {
   photos: Array<{
     id: string;
@@ -22,7 +20,7 @@ type SiteProfilePhotoLibraryProps = {
     event: {
       title: string;
       slug: string;
-      eventDate: string;
+      eventDateLabel: string;
     };
   }>;
 };
@@ -181,7 +179,7 @@ export function SiteProfilePhotoLibrary({
                   <div className="space-y-2">
                     <p className="text-sm text-white/82">{photo.event.title}</p>
                     <p className="text-xs uppercase tracking-[0.22em] text-white/44">
-                      {formatShortDate(new Date(photo.event.eventDate))} · {photo.originalFilename}
+                      {photo.event.eventDateLabel} · {photo.originalFilename}
                     </p>
                     <p className="text-sm leading-6 text-white/58">
                       {photo.caption ?? photo.altText ?? `Photo ${photo.id}`}

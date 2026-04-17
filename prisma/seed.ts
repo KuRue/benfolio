@@ -27,6 +27,14 @@ async function main() {
     },
   });
 
+  await prisma.appSettings.upsert({
+    where: { id: "default" },
+    update: {},
+    create: {
+      id: "default",
+    },
+  });
+
   const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD?.trim();
   const displayName = process.env.SEED_ADMIN_NAME?.trim() || "Studio Admin";

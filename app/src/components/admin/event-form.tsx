@@ -15,7 +15,6 @@ type EventFormProps = {
   initialValues?: {
     title?: string;
     slug?: string;
-    eventDate?: string;
     location?: string;
     description?: string;
     visibility?: "DRAFT" | "HIDDEN" | "PUBLIC";
@@ -80,20 +79,6 @@ export function EventForm({
         </label>
 
         <label className="block space-y-2">
-          <span className="text-sm text-white/68">Event date</span>
-          <input
-            name="eventDate"
-            type="date"
-            defaultValue={initialValues?.eventDate}
-            className="admin-input"
-            required
-          />
-          {state.fieldErrors?.eventDate ? (
-            <span className="text-xs text-[#f3d1aa]">{state.fieldErrors.eventDate}</span>
-          ) : null}
-        </label>
-
-        <label className="block space-y-2">
           <span className="text-sm text-white/68">Location</span>
           <input
             name="location"
@@ -136,6 +121,10 @@ export function EventForm({
           />
         </label>
       </div>
+
+      <p className="text-sm text-white/48">
+        Event dates follow the photo timeline automatically.
+      </p>
 
       <button
         type="submit"

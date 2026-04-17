@@ -17,15 +17,16 @@ const envSchema = z.object({
     .min(1)
     .default("postgresql://gallery:gallery@localhost:5432/gallery?schema=public"),
   REDIS_URL: z.string().url().default("redis://localhost:6379"),
-  S3_ENDPOINT: z.string().url(),
+  S3_ENDPOINT: z.string().url().default("http://localhost:9000"),
   S3_REGION: emptyStringAsUndefined(z.string().default("auto")),
-  S3_ACCESS_KEY_ID: z.string().min(1),
-  S3_SECRET_ACCESS_KEY: z.string().min(1),
+  S3_ACCESS_KEY_ID: z.string().min(1).default("minioadmin"),
+  S3_SECRET_ACCESS_KEY: z.string().min(1).default("minioadmin"),
   S3_FORCE_PATH_STYLE: z
     .union([z.boolean(), z.string()])
+    .default("true")
     .transform((value) => value === true || value === "true"),
-  S3_BUCKET_ORIGINALS: z.string().min(1),
-  S3_BUCKET_DERIVATIVES: z.string().min(1),
+  S3_BUCKET_ORIGINALS: z.string().min(1).default("gallery-originals"),
+  S3_BUCKET_DERIVATIVES: z.string().min(1).default("gallery-derivatives"),
   IMPORTS_PREFIX: emptyStringAsUndefined(z.string().min(1).default("imports/")),
   IMPORTS_CLEANUP_MODE: emptyStringAsUndefined(
     z.enum(["delete", "archive"]).default("delete"),

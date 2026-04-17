@@ -1,11 +1,18 @@
 import type { MetadataRoute } from "next";
 
+import { getResolvedRuntimeSettings } from "@/lib/app-settings";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const settings = await getResolvedRuntimeSettings();
+
+  if (!settings.allowPublicIndexing) {
+    return [];
+  }
+
+  const baseUrl = settings.appUrl;
 
   const [events, photos] = await Promise.all([
     prisma.event.findMany({

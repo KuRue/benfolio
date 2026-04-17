@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 
-import { formatLongDate } from "@/lib/strings";
+import { formatDateRange } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
 
 type EventCardProps = {
@@ -9,6 +9,7 @@ type EventCardProps = {
     title: string;
     slug: string;
     eventDate: Date;
+    eventEndDate: Date | null;
     location: string | null;
     description: string | null;
     coverDisplayKey: string | null;
@@ -38,7 +39,7 @@ export function EventCard({ event }: EventCardProps) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_35%,_rgba(0,0,0,0.18)_100%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
         <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 lg:p-5">
           <div className="glass-panel inline-flex items-center gap-3 rounded-full px-3.5 py-2 text-[0.66rem] uppercase tracking-[0.28em] text-white/66">
-            <span>{formatLongDate(event.eventDate)}</span>
+            <span>{formatDateRange(event.eventDate, event.eventEndDate, "short")}</span>
             <span className="h-1 w-1 rounded-full bg-white/36" />
             <span>{event._count.photos} photos</span>
           </div>

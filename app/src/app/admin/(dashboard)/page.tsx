@@ -1,16 +1,20 @@
 import Link from "next/link";
 
+import { SystemStatusPanel } from "@/components/admin/system-status-panel";
 import { getAdminDashboardData } from "@/lib/admin-data";
+import { getSystemDiagnostics } from "@/lib/system-status";
 
 export default async function AdminOverviewPage() {
-  const dashboard = await getAdminDashboardData();
+  const [dashboard, diagnostics] = await Promise.all([
+    getAdminDashboardData(),
+    getSystemDiagnostics(),
+  ]);
 
   const cards = [
-    { label: "Public events", value: dashboard.visibilitySummary.PUBLIC ?? 0 },
-    { label: "Hidden events", value: dashboard.visibilitySummary.HIDDEN ?? 0 },
-    { label: "Draft events", value: dashboard.visibilitySummary.DRAFT ?? 0 },
-    { label: "Import jobs", value: dashboard.importJobCount },
     { label: "Photos", value: dashboard.photoCount },
+    { label: "Public", value: dashboard.visibilitySummary.PUBLIC ?? 0 },
+    { label: "Drafts", value: dashboard.visibilitySummary.DRAFT ?? 0 },
+    { label: "Imports", value: dashboard.importJobCount },
   ];
 
   return (
@@ -37,7 +41,7 @@ export default async function AdminOverviewPage() {
       </section>
 
       <section className="admin-card px-4 py-3 sm:px-5 sm:py-4">
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           {cards.map((card) => (
             <div
               key={card.label}
@@ -53,6 +57,22 @@ export default async function AdminOverviewPage() {
           ))}
         </div>
       </section>
+
+      <SystemStatusPanel
+        compact
+        initialDiagnostics={{
+          checks: diagnostics.checks,
+          queueCounts: diagnostics.queueCounts,
+          failures: diagnostics.failures,
+          lastSuccess: {
+            photoProcessedAt: diagnostics.lastSuccess.photoProcessedAt?.toISOString() ?? null,
+            importCompletedAt:
+              diagnostics.lastSuccess.importCompletedAt?.toISOString() ?? null,
+          },
+          setup: diagnostics.setup,
+          warnings: diagnostics.warnings,
+        }}
+      />
 
       <section className="admin-card space-y-4 px-5 py-5 sm:px-6 sm:py-6">
         <div className="flex flex-wrap items-center justify-between gap-4">

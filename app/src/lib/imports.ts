@@ -2,14 +2,14 @@ import "server-only";
 
 import { Prisma, type ImportItemStatus } from "../../../prisma/generated/client/client";
 
-import { env } from "@/lib/env";
+import { getResolvedRuntimeSettings } from "@/lib/app-settings";
 import {
   recordImportJobEvents,
   type ImportTimelineEventInput,
 } from "@/lib/import-timeline";
 import { prisma } from "@/lib/prisma";
 import { enqueueImportProcessing } from "@/lib/queue";
-import { listObjects, storageBuckets } from "@/lib/storage";
+import { getStorageBuckets, listObjects } from "@/lib/storage";
 import type {
   StorageWebhookAdapterId,
   StorageWebhookRecord,
@@ -247,9 +247,7 @@ function serializeDate(value: Date | null) {
   return value ? value.toISOString() : null;
 }
 
-function parseImportObjectKey(sourceKey: string) {
-  const importsPrefix = normalizePrefix(env.IMPORTS_PREFIX);
-
+function parseImportObjectKey(sourceKey: string, importsPrefix: string) {
   if (!sourceKey.startsWith(importsPrefix)) {
     return null;
   }
@@ -274,9 +272,15 @@ function parseImportObjectKey(sourceKey: string) {
   };
 }
 
-export function buildImportArchiveKey(sourceKey: string) {
-  const importsPrefix = normalizePrefix(env.IMPORTS_PREFIX);
-  const archivePrefix = normalizePrefix(env.IMPORTS_ARCHIVE_PREFIX);
+export function buildImportArchiveKey(
+  sourceKey: string,
+  config: {
+    importsPrefix: string;
+    importsArchivePrefix: string;
+  },
+) {
+  const importsPrefix = normalizePrefix(config.importsPrefix);
+  const archivePrefix = normalizePrefix(config.importsArchivePrefix);
 
   if (!sourceKey.startsWith(importsPrefix)) {
     return `${archivePrefix}${sourceKey}`;
@@ -361,7 +365,10 @@ export function parseStorageImportPayload(payload: unknown): StorageImportPayloa
   };
 }
 
-async function findOrCreateImportEvent(eventSlug: string) {
+async function findOrCreateImportEvent(
+  eventSlug: string,
+  defaultVisibility: "DRAFT" | "HIDDEN" | "PUBLIC",
+) {
   const existing = await prisma.event.findUnique({
     where: {
       slug: eventSlug,
@@ -386,7 +393,9 @@ async function findOrCreateImportEvent(eventSlug: string) {
         slug: eventSlug,
         title: titleFromSlug(eventSlug),
         eventDate: new Date(),
-        visibility: "DRAFT",
+        eventEndDate: null,
+        visibility: defaultVisibility,
+        publishedAt: defaultVisibility === "PUBLIC" ? new Date() : null,
       },
       select: {
         id: true,
@@ -616,8 +625,13 @@ function buildStorageImportPayload(args: {
   adapterId: StorageWebhookAdapterId | null;
   eventSlug: string;
   files: ImportCandidate[];
+  settings: {
+    importsPrefix: string;
+    importsCleanupMode: ImportCleanupMode;
+    importsArchivePrefix: string;
+  };
 }) {
-  const cleanupMode = env.IMPORTS_CLEANUP_MODE;
+  const cleanupMode = args.settings.importsCleanupMode;
 
   return {
     kind: "storage-import",
@@ -625,10 +639,12 @@ function buildStorageImportPayload(args: {
     trigger: args.trigger,
     adapterId: args.adapterId,
     eventSlug: args.eventSlug,
-    sourcePrefix: normalizePrefix(env.IMPORTS_PREFIX),
+    sourcePrefix: normalizePrefix(args.settings.importsPrefix),
     cleanupMode,
     archivePrefix:
-      cleanupMode === "archive" ? normalizePrefix(env.IMPORTS_ARCHIVE_PREFIX) : null,
+      cleanupMode === "archive"
+        ? normalizePrefix(args.settings.importsArchivePrefix)
+        : null,
     files: args.files.map((file) => ({
       sourceKey: file.sourceKey,
       filename: file.sourceFilename,
@@ -649,6 +665,7 @@ function buildCreationEvents(args: {
   eventId: string;
   eventWasCreated: boolean;
   queued: boolean;
+  cleanupMode: ImportCleanupMode;
 }) {
   const discoveryEventType =
     args.candidate.trigger === "webhook" ? "webhook.received" : "scan.discovered";
@@ -691,7 +708,7 @@ function buildCreationEvents(args: {
       eventType: "processing.queued",
       label: "Queued for import processing",
       metadataJson: {
-        cleanupMode: env.IMPORTS_CLEANUP_MODE,
+        cleanupMode: args.cleanupMode,
       } satisfies Prisma.InputJsonValue,
     });
   } else if (args.candidate.decision.mode === "skip") {
@@ -745,10 +762,14 @@ async function queueStorageImportCandidates(args: {
     itemsSkipped: 0,
     eventsCreated: 0,
   };
+  const runtimeSettings = await getResolvedRuntimeSettings();
 
   for (const [eventSlug, group] of groupedBySlug) {
     const existingState = await loadExistingImportState(group.map((item) => item.sourceKey));
-    const { event, created } = await findOrCreateImportEvent(eventSlug);
+    const { event, created } = await findOrCreateImportEvent(
+      eventSlug,
+      runtimeSettings.defaultEventVisibility,
+    );
 
     if (created) {
       summary.eventsCreated += 1;
@@ -769,6 +790,7 @@ async function queueStorageImportCandidates(args: {
       adapterId: args.adapterId,
       eventSlug,
       files: group,
+      settings: runtimeSettings,
     });
 
     const importJob = await prisma.$transaction(async (tx) => {
@@ -811,7 +833,7 @@ async function queueStorageImportCandidates(args: {
               ? candidate.decision.photoId
               : null,
           status: candidate.decision.mode === "skip" ? "SKIPPED" : "PENDING",
-          cleanupMode: env.IMPORTS_CLEANUP_MODE,
+          cleanupMode: runtimeSettings.importsCleanupMode,
           cleanupStatus:
             candidate.decision.mode === "skip"
               ? candidate.decision.cleanupStatus
@@ -819,8 +841,11 @@ async function queueStorageImportCandidates(args: {
           cleanupTargetKey:
             candidate.decision.mode === "skip"
               ? candidate.decision.cleanupTargetKey
-              : env.IMPORTS_CLEANUP_MODE === "archive"
-                ? buildImportArchiveKey(candidate.sourceKey)
+              : runtimeSettings.importsCleanupMode === "archive"
+                ? buildImportArchiveKey(candidate.sourceKey, {
+                    importsPrefix: runtimeSettings.importsPrefix,
+                    importsArchivePrefix: runtimeSettings.importsArchivePrefix,
+                  })
                 : null,
           skipReason:
             candidate.decision.mode === "skip"
@@ -859,6 +884,7 @@ async function queueStorageImportCandidates(args: {
           eventId: event.id,
           eventWasCreated: created,
           queued: candidate.decision.mode === "queue",
+          cleanupMode: runtimeSettings.importsCleanupMode,
         }).map((timelineEvent) => ({
           importItemId: itemId,
           eventType: timelineEvent.eventType,
@@ -903,14 +929,18 @@ async function queueStorageImportCandidates(args: {
 }
 
 export async function scanAndEnqueueStorageImports(requestedById?: string | null) {
+  const [runtimeSettings, buckets] = await Promise.all([
+    getResolvedRuntimeSettings(),
+    getStorageBuckets(),
+  ]);
   const importObjects = await listObjects({
-    bucket: storageBuckets.originals,
-    prefix: normalizePrefix(env.IMPORTS_PREFIX),
+    bucket: buckets.originals,
+    prefix: normalizePrefix(runtimeSettings.importsPrefix),
   });
 
   const candidates = importObjects
     .map((object) => {
-      const parsed = parseImportObjectKey(object.key);
+      const parsed = parseImportObjectKey(object.key, runtimeSettings.importsPrefix);
 
       if (!parsed) {
         return null;
@@ -924,7 +954,7 @@ export async function scanAndEnqueueStorageImports(requestedById?: string | null
         sourceByteSize: object.size,
         sourceLastModified: object.lastModified,
         eventSlug: parsed.eventSlug,
-        bucket: storageBuckets.originals,
+        bucket: buckets.originals,
         eventName: null,
         deliveryId: null,
         sourceProvider: "manual-scan",
@@ -937,7 +967,7 @@ export async function scanAndEnqueueStorageImports(requestedById?: string | null
   logImport("info", "imports.scan.discovered", {
     objectCount: importObjects.length,
     candidateCount: candidates.length,
-    prefix: normalizePrefix(env.IMPORTS_PREFIX),
+    prefix: normalizePrefix(runtimeSettings.importsPrefix),
   });
 
   return queueStorageImportCandidates({
@@ -952,9 +982,13 @@ export async function enqueueWebhookStorageImports(args: {
   records: StorageWebhookRecord[];
   adapterId?: StorageWebhookAdapterId | null;
 }) {
+  const runtimeSettings = await getResolvedRuntimeSettings();
   const candidates = args.records
     .map((record) => {
-      const parsed = parseImportObjectKey(record.sourceKey);
+      const parsed = parseImportObjectKey(
+        record.sourceKey,
+        runtimeSettings.importsPrefix,
+      );
 
       if (!parsed) {
         return null;

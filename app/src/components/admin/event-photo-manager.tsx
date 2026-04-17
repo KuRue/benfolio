@@ -21,7 +21,7 @@ type EventPhotoManagerProps = {
     title: string;
     slug: string;
     visibility: "DRAFT" | "HIDDEN" | "PUBLIC";
-    eventDate: string | null;
+    eventDateLabel: string;
   }>;
   filters: {
     status: "ALL" | ProcessingState;
@@ -99,15 +99,7 @@ function formatDateTime(value: string | null) {
 }
 
 function formatEventOptionLabel(event: EventPhotoManagerProps["eventOptions"][number]) {
-  const date = event.eventDate
-    ? new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }).format(new Date(event.eventDate))
-    : "No date";
-
-  return `${event.title} · ${event.slug} · ${date} · ${event.visibility.toLowerCase()}`;
+  return `${event.title} · ${event.slug} · ${event.eventDateLabel} · ${event.visibility.toLowerCase()}`;
 }
 
 function toDateTimeLocalValue(value: string | null) {

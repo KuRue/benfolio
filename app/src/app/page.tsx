@@ -5,12 +5,16 @@ import { getHomepageData } from "@/lib/gallery";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const { siteProfile, events } = await getHomepageData();
+  const { siteProfile, runtimeSettings, events } = await getHomepageData();
 
   return (
     <main className="pb-14 pt-1 sm:pt-2 lg:pt-3">
       <div className="section-shell space-y-3 sm:space-y-4">
-        <SiteHeader profile={siteProfile} />
+        <SiteHeader
+          profile={siteProfile}
+          showSearch={runtimeSettings.publicSearchEnabled}
+          showLogoMark={runtimeSettings.logoMarkEnabled}
+        />
 
         <section>
           {events.length ? (

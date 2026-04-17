@@ -10,23 +10,53 @@ import {
 } from "@aws-sdk/client-s3";
 
 import { env } from "./env.js";
+import { getResolvedRuntimeSettings } from "./runtime-settings.js";
 
-const s3 = new S3Client({
-  region: env.S3_REGION,
-  endpoint: env.S3_ENDPOINT,
-  forcePathStyle: env.S3_FORCE_PATH_STYLE,
-  credentials: {
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-  },
-});
+let cachedStorageClient: {
+  key: string;
+  client: S3Client;
+} | null = null;
 
-export const storageBuckets = {
-  originals: env.S3_BUCKET_ORIGINALS,
-  derivatives: env.S3_BUCKET_DERIVATIVES,
-} as const;
+async function getStorageRuntime() {
+  const settings = await getResolvedRuntimeSettings();
+  const key = JSON.stringify({
+    endpoint: settings.storageEndpoint,
+    region: settings.storageRegion,
+    forcePathStyle: settings.storageForcePathStyle,
+  });
+
+  if (cachedStorageClient?.key !== key) {
+    cachedStorageClient = {
+      key,
+      client: new S3Client({
+        region: settings.storageRegion,
+        endpoint: settings.storageEndpoint,
+        forcePathStyle: settings.storageForcePathStyle,
+        credentials: {
+          accessKeyId: env.S3_ACCESS_KEY_ID,
+          secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+        },
+      }),
+    };
+  }
+
+  return {
+    s3: cachedStorageClient.client,
+    buckets: {
+      originals: settings.storageOriginalsBucket,
+      derivatives: settings.storageDerivativesBucket,
+    },
+    settings,
+  };
+}
+
+export async function getStorageBuckets() {
+  const { buckets } = await getStorageRuntime();
+  return buckets;
+}
 
 export async function readObject(bucket: string, key: string) {
+  const { s3 } = await getStorageRuntime();
   const response = await s3.send(
     new GetObjectCommand({
       Bucket: bucket,
@@ -42,6 +72,7 @@ export async function readObject(bucket: string, key: string) {
 }
 
 export async function headObject(bucket: string, key: string) {
+  const { s3 } = await getStorageRuntime();
   const response = await s3.send(
     new HeadObjectCommand({
       Bucket: bucket,
@@ -71,6 +102,7 @@ export async function copyObject(args: {
   destinationBucket: string;
   destinationKey: string;
 }) {
+  const { s3 } = await getStorageRuntime();
   await s3.send(
     new CopyObjectCommand({
       Bucket: args.destinationBucket,
@@ -82,6 +114,7 @@ export async function copyObject(args: {
 }
 
 export async function deleteObjects(args: { bucket: string; keys: string[] }) {
+  const { s3 } = await getStorageRuntime();
   const keys = args.keys.filter(Boolean);
 
   if (!keys.length) {
@@ -106,6 +139,7 @@ export async function uploadObject(args: {
   contentType: string;
   cacheControl?: string;
 }) {
+  const { s3 } = await getStorageRuntime();
   await s3.send(
     new PutObjectCommand({
       Bucket: args.bucket,

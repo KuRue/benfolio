@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getResolvedRuntimeSettings } from "@/lib/app-settings";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveTakenAt } from "@/lib/photo-order";
 import { buildDisplayUrl } from "@/lib/storage";
@@ -56,8 +57,9 @@ export async function getSiteProfile() {
 }
 
 export async function getHomepageData() {
-  const [siteProfile, events] = await Promise.all([
+  const [siteProfile, runtimeSettings, events] = await Promise.all([
     getSiteProfile(),
+    getResolvedRuntimeSettings(),
     prisma.event.findMany({
       where: {
         visibility: "PUBLIC",
@@ -73,7 +75,7 @@ export async function getHomepageData() {
     }),
   ]);
 
-  return { siteProfile, events };
+  return { siteProfile, runtimeSettings, events };
 }
 
 export async function getPublicEventBySlug(slug: string) {
@@ -121,7 +123,9 @@ export async function getPublicEventBySlug(slug: string) {
 }
 
 export async function getPhotoViewerData(photoId: string) {
-  const photo = await prisma.photo.findUnique({
+  const [runtimeSettings, photo] = await Promise.all([
+    getResolvedRuntimeSettings(),
+    prisma.photo.findUnique({
     where: { id: photoId },
     include: {
       event: true,
@@ -139,7 +143,8 @@ export async function getPhotoViewerData(photoId: string) {
         },
       },
     },
-  });
+    }),
+  ]);
 
   if (!photo || photo.event.visibility === "DRAFT") {
     return null;
@@ -209,11 +214,19 @@ export async function getPhotoViewerData(photoId: string) {
     ),
     nextImageUrl: buildDisplayUrl(nextPhoto?.derivatives[0]?.storageKey ?? null),
     robotsNoIndex: photo.event.visibility === "HIDDEN",
+    downloadsEnabled: runtimeSettings.downloadsEnabled,
+    blurDataUrl: photo.blurDataUrl,
     tags: photo.tags.map((photoTag) => photoTag.tag),
   };
 }
 
 export async function getPhotoDownloadData(photoId: string) {
+  const runtimeSettings = await getResolvedRuntimeSettings();
+
+  if (!runtimeSettings.downloadsEnabled) {
+    return null;
+  }
+
   return prisma.photo.findUnique({
     where: {
       id: photoId,

@@ -1,13 +1,13 @@
 import { randomBytes } from "node:crypto";
 
 import { Prisma } from "../../prisma/generated/client/client.ts";
-import { env } from "./env.js";
 import {
   recordImportItemEvents,
   recordManyImportItemEvents,
 } from "./import-events.js";
+import { inferPhotoMimeType } from "./photo-files.js";
 import { prisma } from "./prisma.js";
-import { copyObject, deleteObjects, headObject, storageBuckets } from "./storage.js";
+import { getStorageBuckets, copyObject, deleteObjects, headObject } from "./storage.js";
 
 const BASE62_ALPHABET =
   "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -102,9 +102,15 @@ function extensionFromFilename(filename: string) {
   return parts.length > 1 ? parts.at(-1)?.toLowerCase() ?? "jpg" : "jpg";
 }
 
-function buildImportArchiveKey(sourceKey: string) {
-  const importsPrefix = normalizePrefix(env.IMPORTS_PREFIX);
-  const archivePrefix = normalizePrefix(env.IMPORTS_ARCHIVE_PREFIX);
+function buildImportArchiveKey(
+  sourceKey: string,
+  config: {
+    importsPrefix: string;
+    importsArchivePrefix: string;
+  },
+) {
+  const importsPrefix = normalizePrefix(config.importsPrefix);
+  const archivePrefix = normalizePrefix(config.importsArchivePrefix);
 
   if (!sourceKey.startsWith(importsPrefix)) {
     return `${archivePrefix}${sourceKey}`;
@@ -202,14 +208,14 @@ function buildImportLinkMetadata(args: {
   importItemId: string;
   sourceKey: string;
   cleanupMode: ImportCleanupMode;
+  cleanupTargetKey: string | null;
 }) {
   return {
     importJobId: args.importJobId,
     importItemId: args.importItemId,
     sourceKey: args.sourceKey,
     cleanupMode: args.cleanupMode,
-    archiveKey:
-      args.cleanupMode === "archive" ? buildImportArchiveKey(args.sourceKey) : null,
+    archiveKey: args.cleanupTargetKey,
     cleanupStatus: "pending",
     cleanupError: null,
     cleanupCompletedAt: null,
@@ -384,16 +390,16 @@ async function cleanupImportSourceLink(args: {
     cleanupTargetKey: string | null;
   };
 }) {
+  const buckets = await getStorageBuckets();
   const metadata = getMetadataRecord(args.link.metadataJson);
   const existingCleanupStatus =
     typeof metadata.cleanupStatus === "string" ? metadata.cleanupStatus : "pending";
 
   if (existingCleanupStatus === "completed") {
     const cleanupMode =
-      args.importItem.cleanupMode === "archive" ? "archive" : env.IMPORTS_CLEANUP_MODE;
+      args.importItem.cleanupMode === "archive" ? "archive" : "delete";
     const cleanupTargetKey =
-      args.importItem.cleanupTargetKey ??
-      (cleanupMode === "archive" ? buildImportArchiveKey(args.link.externalId) : null);
+      args.importItem.cleanupTargetKey ?? null;
 
     await recordImportItemEvents(args.importItem.id, [
       {
@@ -414,23 +420,22 @@ async function cleanupImportSourceLink(args: {
   }
 
   const cleanupMode =
-    args.importItem.cleanupMode === "archive" ? "archive" : env.IMPORTS_CLEANUP_MODE;
+    args.importItem.cleanupMode === "archive" ? "archive" : "delete";
   const cleanupTargetKey =
-    args.importItem.cleanupTargetKey ??
-    (cleanupMode === "archive" ? buildImportArchiveKey(args.link.externalId) : null);
+    args.importItem.cleanupTargetKey ?? null;
 
   try {
     if (cleanupMode === "archive" && cleanupTargetKey) {
       await copyObject({
-        sourceBucket: storageBuckets.originals,
+        sourceBucket: buckets.originals,
         sourceKey: args.link.externalId,
-        destinationBucket: storageBuckets.originals,
+        destinationBucket: buckets.originals,
         destinationKey: cleanupTargetKey,
       });
     }
 
     await deleteObjects({
-      bucket: storageBuckets.originals,
+      bucket: buckets.originals,
       keys: [args.link.externalId],
     });
 
@@ -698,6 +703,7 @@ async function createPhotoFromImportItem(args: {
   const filename = fileEntry?.filename ?? args.importItem.sourceFilename;
 
   let destinationKey: string | null = null;
+  const buckets = await getStorageBuckets();
 
   try {
     const photoId = generatePhotoId();
@@ -712,14 +718,27 @@ async function createPhotoFromImportItem(args: {
       },
     });
 
-    const objectHead = await headObject(storageBuckets.originals, args.importItem.sourceKey);
+    const objectHead = await headObject(buckets.originals, args.importItem.sourceKey);
 
     await copyObject({
-      sourceBucket: storageBuckets.originals,
+      sourceBucket: buckets.originals,
       sourceKey: args.importItem.sourceKey,
-      destinationBucket: storageBuckets.originals,
+      destinationBucket: buckets.originals,
       destinationKey,
     });
+    const cleanupMode =
+      args.importItem.cleanupMode === "archive"
+        ? "archive"
+        : args.payload.cleanupMode;
+    const cleanupTargetKey =
+      args.importItem.cleanupTargetKey ??
+      (cleanupMode === "archive"
+        ? buildImportArchiveKey(args.importItem.sourceKey, {
+            importsPrefix: args.payload.sourcePrefix,
+            importsArchivePrefix:
+              args.payload.archivePrefix ?? "processed-imports/",
+          })
+        : null);
 
     await prisma.$transaction([
       prisma.photo.create({
@@ -728,7 +747,7 @@ async function createPhotoFromImportItem(args: {
           eventId: args.importItem.eventId,
           originalKey: destinationKey,
           originalFilename: filename,
-          originalMimeType: objectHead.contentType,
+          originalMimeType: inferPhotoMimeType(filename, objectHead.contentType),
           originalByteSize: BigInt(
             objectHead.contentLength ?? args.importItem.sourceByteSize ?? 0n,
           ),
@@ -746,8 +765,8 @@ async function createPhotoFromImportItem(args: {
             importJobId: args.importItem.importJobId,
             importItemId: args.importItem.id,
             sourceKey: args.importItem.sourceKey,
-            cleanupMode:
-              args.importItem.cleanupMode === "archive" ? "archive" : "delete",
+            cleanupMode,
+            cleanupTargetKey,
           }),
         },
       }),
@@ -823,7 +842,7 @@ async function createPhotoFromImportItem(args: {
       if (existingLink) {
         if (destinationKey) {
           await deleteObjects({
-            bucket: storageBuckets.originals,
+            bucket: buckets.originals,
             keys: [destinationKey],
           });
         }
@@ -851,7 +870,7 @@ async function createPhotoFromImportItem(args: {
 
     if (destinationKey) {
       await deleteObjects({
-        bucket: storageBuckets.originals,
+        bucket: buckets.originals,
         keys: [destinationKey],
       });
     }

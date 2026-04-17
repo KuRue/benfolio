@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { Queue, Worker } from "bullmq";
-import exifr from "exifr";
+import exifr, { thumbnail as extractEmbeddedThumbnail } from "exifr";
 import { Redis } from "ioredis";
 import sharp from "sharp";
 
@@ -12,8 +12,9 @@ import {
   handleImportedPhotoReady,
   processImportJob,
 } from "./imports.js";
+import { inferPhotoMimeType, isRawPhotoFile } from "./photo-files.js";
 import { prisma } from "./prisma.js";
-import { readObject, storageBuckets, uploadObject } from "./storage.js";
+import { getStorageBuckets, readObject, uploadObject } from "./storage.js";
 
 const PHOTO_PROCESSING_QUEUE = "photo-processing";
 const IMPORT_PROCESSING_QUEUE = "import-processing";
@@ -33,6 +34,31 @@ const connection = new Redis(env.REDIS_URL, {
 const photoQueue = new Queue<PhotoProcessingJob>(PHOTO_PROCESSING_QUEUE, {
   connection,
 });
+const WORKER_HEARTBEAT_ID = "worker";
+
+async function recordWorkerHeartbeat(
+  updates?: Partial<{
+    lastPhotoProcessedAt: Date;
+    lastImportProcessedAt: Date;
+  }>,
+) {
+  const lastHeartbeatAt = new Date();
+
+  await prisma.workerHeartbeat.upsert({
+    where: {
+      id: WORKER_HEARTBEAT_ID,
+    },
+    update: {
+      lastHeartbeatAt,
+      ...updates,
+    },
+    create: {
+      id: WORKER_HEARTBEAT_ID,
+      lastHeartbeatAt,
+      ...updates,
+    },
+  });
+}
 
 function formatFocalLength(value: unknown) {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -104,10 +130,92 @@ async function getDominantColor(image: sharp.Sharp) {
     .join("")}`;
 }
 
+function getNumericExifValue(exif: Record<string, unknown> | null | undefined, keys: string[]) {
+  for (const key of keys) {
+    const value = exif?.[key];
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      return Math.round(value);
+    }
+  }
+
+  return null;
+}
+
+async function createRenderableImage(args: {
+  originalBuffer: Buffer;
+  originalFilename: string;
+  originalMimeType: string;
+}) {
+  async function decodeBuffer(buffer: Buffer) {
+    const image = sharp(buffer).rotate();
+    const metadata = await image.metadata();
+    return { image, metadata };
+  }
+
+  async function decodeEmbeddedPreview() {
+    const preview = await extractEmbeddedThumbnail(args.originalBuffer);
+
+    if (!preview) {
+      return null;
+    }
+
+    const previewBuffer = Buffer.isBuffer(preview)
+      ? preview
+      : Buffer.from(preview);
+
+    const decoded = await decodeBuffer(previewBuffer);
+    return {
+      ...decoded,
+      source: "embedded-preview" as const,
+    };
+  }
+
+  const likelyRaw = isRawPhotoFile(args.originalFilename, args.originalMimeType);
+
+  if (likelyRaw) {
+    try {
+      const previewDecoded = await decodeEmbeddedPreview();
+      if (previewDecoded) {
+        return previewDecoded;
+      }
+    } catch {
+      // Fall through to direct decoding before failing the job.
+    }
+  }
+
+  try {
+    const decoded = await decodeBuffer(args.originalBuffer);
+    return {
+      ...decoded,
+      source: "original" as const,
+    };
+  } catch (originalError) {
+    const previewDecoded = await decodeEmbeddedPreview();
+
+    if (previewDecoded) {
+      return previewDecoded;
+    }
+
+    const message =
+      originalError instanceof Error
+        ? originalError.message
+        : "Unknown image decode failure.";
+
+    if (likelyRaw) {
+      throw new Error(
+        `Could not render ${args.originalFilename}. This RAW file did not expose an embedded preview the worker could use. ${message}`,
+      );
+    }
+
+    throw new Error(`Could not render ${args.originalFilename}. ${message}`);
+  }
+}
+
 async function normalizeEventSortOrder(eventId: string) {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     select: {
+      createdAt: true,
       photoOrderMode: true,
     },
   });
@@ -156,14 +264,30 @@ async function normalizeEventSortOrder(eventId: string) {
           return left.id.localeCompare(right.id);
         });
 
-  await prisma.$transaction(
-    ordered.map((photo, index) =>
+  const chronologyDates = photos
+    .map((photo) => photo.takenAtOverride ?? photo.capturedAt ?? photo.createdAt)
+    .sort((left, right) => left.getTime() - right.getTime());
+  const eventDate = chronologyDates[0] ?? event.createdAt;
+  const lastDate = chronologyDates.at(-1) ?? eventDate;
+  const eventEndDate =
+    lastDate.getTime() === eventDate.getTime() ? null : lastDate;
+  const eventUpdateData: Prisma.EventUpdateInput = {
+    eventDate,
+    eventEndDate,
+  };
+
+  await prisma.$transaction([
+    ...ordered.map((photo, index) =>
       prisma.photo.update({
         where: { id: photo.id },
         data: { sortOrder: index },
       }),
     ),
-  );
+    prisma.event.update({
+      where: { id: eventId },
+      data: eventUpdateData,
+    }),
+  ]);
 }
 
 async function processPhoto(photoId: string) {
@@ -186,13 +310,22 @@ async function processPhoto(photoId: string) {
     },
   });
 
-  const originalBuffer = await readObject(storageBuckets.originals, photo.originalKey);
+  const buckets = await getStorageBuckets();
+  const originalBuffer = await readObject(buckets.originals, photo.originalKey);
   const contentHashSha256 = createHash("sha256").update(originalBuffer).digest("hex");
-  const image = sharp(originalBuffer).rotate();
-  const metadata = await image.metadata();
   const exif = await exifr.parse(originalBuffer, {
     translateValues: false,
   });
+  const renderable = await createRenderableImage({
+    originalBuffer,
+    originalFilename: photo.originalFilename,
+    originalMimeType: inferPhotoMimeType(
+      photo.originalFilename,
+      photo.originalMimeType,
+    ),
+  });
+  const image = renderable.image;
+  const metadata = renderable.metadata;
 
   const blurDataUrl = await buildBlurDataUrl(image);
   const dominantColor = await getDominantColor(image);
@@ -215,7 +348,7 @@ async function processPhoto(photoId: string) {
       const storageKey = `events/${photo.eventId}/photos/${photo.id}/${preset.kind.toLowerCase()}-${info.width}.webp`;
 
       await uploadObject({
-        bucket: storageBuckets.derivatives,
+        bucket: buckets.derivatives,
         key: storageKey,
         body: data,
         contentType: "image/webp",
@@ -250,9 +383,24 @@ async function processPhoto(photoId: string) {
     prisma.photo.update({
       where: { id: photoId },
       data: {
-        width: metadata.width ?? null,
-        height: metadata.height ?? null,
-        orientation: metadata.orientation ?? null,
+        width:
+          getNumericExifValue(exif, [
+            "ExifImageWidth",
+            "ImageWidth",
+            "PixelXDimension",
+          ]) ??
+          metadata.width ??
+          null,
+        height:
+          getNumericExifValue(exif, [
+            "ExifImageHeight",
+            "ImageLength",
+            "PixelYDimension",
+          ]) ??
+          metadata.height ??
+          null,
+        orientation:
+          getNumericExifValue(exif, ["Orientation"]) ?? metadata.orientation ?? null,
         blurDataUrl,
         dominantColor,
         capturedAt,
@@ -325,6 +473,9 @@ const importWorker = new Worker<ImportProcessingJob>(
 );
 
 worker.on("completed", (job) => {
+  void recordWorkerHeartbeat({
+    lastPhotoProcessedAt: new Date(),
+  });
   console.log(`Processed photo ${job.data.photoId}`);
 });
 
@@ -348,6 +499,9 @@ worker.on("failed", async (job, error) => {
 });
 
 importWorker.on("completed", (job) => {
+  void recordWorkerHeartbeat({
+    lastImportProcessedAt: new Date(),
+  });
   console.log(`Processed import job ${job.data.importJobId}`);
 });
 
@@ -369,7 +523,18 @@ importWorker.on("failed", async (job, error) => {
   console.error(`Failed import job ${job.data.importJobId}: ${error.message}`);
 });
 
+const heartbeatInterval = setInterval(() => {
+  void recordWorkerHeartbeat().catch((error) => {
+    console.error("Worker heartbeat failed", error);
+  });
+}, 30_000);
+
+void recordWorkerHeartbeat().catch((error) => {
+  console.error("Initial worker heartbeat failed", error);
+});
+
 process.on("SIGINT", async () => {
+  clearInterval(heartbeatInterval);
   await worker.close();
   await importWorker.close();
   await photoQueue.close();

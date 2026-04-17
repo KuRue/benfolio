@@ -92,6 +92,28 @@ enum TagCategory {
   GENERAL
 }
 
+model AppSettings {
+  id                       String          @id @default("default")
+  storageProviderLabel     String?
+  storageEndpoint          String?
+  storagePublicEndpoint    String?
+  storageRegion            String?
+  storageForcePathStyle    Boolean?
+  storageOriginalsBucket   String?
+  storageDerivativesBucket String?
+  importsPrefix            String?
+  importsCleanupMode       String?
+  importsArchivePrefix     String?
+  publicSearchEnabled      Boolean         @default(true)
+  downloadsEnabled         Boolean         @default(true)
+  allowPublicIndexing      Boolean         @default(true)
+  defaultEventVisibility   EventVisibility @default(DRAFT)
+  directUploadEnabled      Boolean         @default(true)
+  logoMarkEnabled          Boolean         @default(true)
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+}
+
 model SiteProfile {
   id                String   @id @default("default")
   displayName       String   @default("Your Studio")
@@ -119,6 +141,7 @@ model Event {
   title           String
   slug            String          @unique
   eventDate       DateTime
+  eventEndDate    DateTime?
   location        String?
   description     String?
   visibility      EventVisibility @default(DRAFT)
@@ -137,6 +160,7 @@ model Event {
   duplicateReviews DuplicateReview[]
 
   @@index([eventDate])
+  @@index([eventEndDate])
   @@index([visibility, eventDate])
 }
 
@@ -354,6 +378,15 @@ model DuplicateReview {
   @@unique([scopeKey, contentHashSha256])
   @@index([contentHashSha256])
   @@index([eventId])
+}
+
+model WorkerHeartbeat {
+  id                   String   @id @default("worker")
+  lastHeartbeatAt      DateTime
+  lastPhotoProcessedAt DateTime?
+  lastImportProcessedAt DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model AdminUser {

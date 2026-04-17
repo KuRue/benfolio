@@ -14,7 +14,11 @@ import {
   requireAdmin,
   verifyPassword,
 } from "@/lib/auth";
-import { deleteObjects, extensionFromFilename, storageBuckets, uploadObject } from "@/lib/storage";
+import { getStorageBuckets, deleteObjects, extensionFromFilename, uploadObject } from "@/lib/storage";
+import {
+  clearAppSettingsCache,
+  defaultAppSettingsValues,
+} from "@/lib/app-settings";
 import { prisma } from "@/lib/prisma";
 import { slugify } from "@/lib/strings";
 import { storeSiteProfileImage } from "@/lib/admin-photo-operations";
@@ -25,13 +29,18 @@ export type AuthActionState = {
 
 export type EventActionState = {
   error?: string;
-  fieldErrors?: Partial<Record<"title" | "slug" | "eventDate", string>>;
+  fieldErrors?: Partial<Record<"title" | "slug", string>>;
 };
 
 export type SiteProfileActionState = {
   error?: string;
   success?: string;
   fieldErrors?: Partial<Record<"displayName", string>>;
+};
+
+export type AppSettingsActionState = {
+  error?: string;
+  success?: string;
 };
 
 type EventVisibilityValue = "DRAFT" | "HIDDEN" | "PUBLIC";
@@ -44,6 +53,10 @@ function asVisibility(value: string): EventVisibilityValue {
   return value === "PUBLIC" || value === "HIDDEN" || value === "DRAFT"
     ? value
     : "DRAFT";
+}
+
+function asBoolean(value: FormDataEntryValue | null) {
+  return value === "on" || value === "true";
 }
 
 function normalizeHandle(value: string) {
@@ -109,6 +122,7 @@ async function slugIsTaken(slug: string, excludeId?: string) {
 }
 
 async function storeEventCover(eventId: string, file: File) {
+  const buckets = await getStorageBuckets();
   const buffer = Buffer.from(await file.arrayBuffer());
   const originalExtension = extensionFromFilename(file.name);
   const originalKey = `events/${eventId}/cover/original.${originalExtension}`;
@@ -127,14 +141,14 @@ async function storeEventCover(eventId: string, file: File) {
 
   await Promise.all([
     uploadObject({
-      bucket: storageBuckets.originals,
+      bucket: buckets.originals,
       key: originalKey,
       body: buffer,
       contentType: file.type || "application/octet-stream",
       cacheControl: "private, max-age=0, no-store",
     }),
     uploadObject({
-      bucket: storageBuckets.derivatives,
+      bucket: buckets.derivatives,
       key: displayKey,
       body: displayBuffer,
       contentType: "image/webp",
@@ -150,18 +164,21 @@ async function storeEventCover(eventId: string, file: File) {
   };
 }
 
+function normalizeOptionalSettingValue(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
+
 async function getValidatedEventPayload(
   formData: FormData,
   currentEventId?: string,
 ) {
   const title = asString(formData.get("title"));
   const slugInput = asString(formData.get("slug"));
-  const eventDateInput = asString(formData.get("eventDate"));
   const location = asString(formData.get("location")) || null;
   const description = asString(formData.get("description")) || null;
   const visibility = asVisibility(asString(formData.get("visibility")));
   const slug = slugify(slugInput || title);
-  const eventDate = eventDateInput ? new Date(eventDateInput) : null;
 
   const fieldErrors: EventActionState["fieldErrors"] = {};
 
@@ -171,10 +188,6 @@ async function getValidatedEventPayload(
 
   if (!slug) {
     fieldErrors.slug = "Slug is required.";
-  }
-
-  if (!eventDate || Number.isNaN(eventDate.getTime())) {
-    fieldErrors.eventDate = "Event date is required.";
   }
 
   if (slug && (await slugIsTaken(slug, currentEventId))) {
@@ -196,7 +209,6 @@ async function getValidatedEventPayload(
     data: {
       title,
       slug,
-      eventDate: eventDate as Date,
       location,
       description,
       visibility,
@@ -356,6 +368,116 @@ export async function updateSiteProfileAction(
   };
 }
 
+export async function updateAppSettingsAction(
+  _previousState: AppSettingsActionState,
+  formData: FormData,
+): Promise<AppSettingsActionState> {
+  await requireAdmin();
+
+  const storageEndpointInput = asString(formData.get("storageEndpoint"));
+  const storagePublicEndpointInput = asString(formData.get("storagePublicEndpoint"));
+  const storageEndpoint =
+    storageEndpointInput ? normalizeOptionalUrl(storageEndpointInput) : null;
+  const storagePublicEndpoint = storagePublicEndpointInput
+    ? normalizeOptionalUrl(storagePublicEndpointInput)
+    : null;
+
+  if (storageEndpointInput && !storageEndpoint) {
+    return {
+      error: "Storage endpoint must be a valid http(s) URL.",
+    };
+  }
+
+  if (storagePublicEndpointInput && !storagePublicEndpoint) {
+    return {
+      error: "Public endpoint must be a valid http(s) URL.",
+    };
+  }
+
+  const importsCleanupMode = asString(formData.get("importsCleanupMode"));
+  const cleanupMode =
+    importsCleanupMode === "archive" || importsCleanupMode === "delete"
+      ? importsCleanupMode
+      : defaultAppSettingsValues.importsCleanupMode;
+
+  await prisma.appSettings.upsert({
+    where: {
+      id: "default",
+    },
+    update: {
+      storageProviderLabel: normalizeOptionalSettingValue(
+        asString(formData.get("storageProviderLabel")),
+      ),
+      storageEndpoint,
+      storagePublicEndpoint,
+      storageRegion: normalizeOptionalSettingValue(asString(formData.get("storageRegion"))),
+      storageForcePathStyle: asBoolean(formData.get("storageForcePathStyle")),
+      storageOriginalsBucket: normalizeOptionalSettingValue(
+        asString(formData.get("storageOriginalsBucket")),
+      ),
+      storageDerivativesBucket: normalizeOptionalSettingValue(
+        asString(formData.get("storageDerivativesBucket")),
+      ),
+      importsPrefix: normalizeOptionalSettingValue(asString(formData.get("importsPrefix"))),
+      importsCleanupMode: cleanupMode,
+      importsArchivePrefix: normalizeOptionalSettingValue(
+        asString(formData.get("importsArchivePrefix")),
+      ),
+      publicSearchEnabled: asBoolean(formData.get("publicSearchEnabled")),
+      downloadsEnabled: asBoolean(formData.get("downloadsEnabled")),
+      allowPublicIndexing: asBoolean(formData.get("allowPublicIndexing")),
+      defaultEventVisibility: asVisibility(
+        asString(formData.get("defaultEventVisibility")),
+      ),
+      directUploadEnabled: asBoolean(formData.get("directUploadEnabled")),
+      logoMarkEnabled: asBoolean(formData.get("logoMarkEnabled")),
+    },
+    create: {
+      id: "default",
+      storageProviderLabel: normalizeOptionalSettingValue(
+        asString(formData.get("storageProviderLabel")),
+      ),
+      storageEndpoint,
+      storagePublicEndpoint,
+      storageRegion: normalizeOptionalSettingValue(asString(formData.get("storageRegion"))),
+      storageForcePathStyle: asBoolean(formData.get("storageForcePathStyle")),
+      storageOriginalsBucket: normalizeOptionalSettingValue(
+        asString(formData.get("storageOriginalsBucket")),
+      ),
+      storageDerivativesBucket: normalizeOptionalSettingValue(
+        asString(formData.get("storageDerivativesBucket")),
+      ),
+      importsPrefix: normalizeOptionalSettingValue(asString(formData.get("importsPrefix"))),
+      importsCleanupMode: cleanupMode,
+      importsArchivePrefix: normalizeOptionalSettingValue(
+        asString(formData.get("importsArchivePrefix")),
+      ),
+      publicSearchEnabled: asBoolean(formData.get("publicSearchEnabled")),
+      downloadsEnabled: asBoolean(formData.get("downloadsEnabled")),
+      allowPublicIndexing: asBoolean(formData.get("allowPublicIndexing")),
+      defaultEventVisibility: asVisibility(
+        asString(formData.get("defaultEventVisibility")),
+      ),
+      directUploadEnabled: asBoolean(formData.get("directUploadEnabled")),
+      logoMarkEnabled: asBoolean(formData.get("logoMarkEnabled")),
+    },
+  });
+
+  clearAppSettingsCache();
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/admin/settings");
+  revalidatePath("/admin/uploads");
+  revalidatePath("/admin/imports");
+  revalidatePath("/sitemap.xml");
+  revalidatePath("/robots.txt");
+
+  return {
+    success: "Operational settings updated.",
+  };
+}
+
 export async function createEventAction(
   _previousState: EventActionState,
   formData: FormData,
@@ -371,6 +493,8 @@ export async function createEventAction(
   const event = await prisma.event.create({
     data: {
       ...validated.data,
+      eventDate: new Date(),
+      eventEndDate: null,
       publishedAt: validated.data.visibility === "PUBLIC" ? new Date() : null,
     },
   });
@@ -473,10 +597,11 @@ export async function deleteEventAction(eventId: string) {
     ),
     event.coverDisplayKey,
   ].filter(Boolean) as string[];
+  const buckets = await getStorageBuckets();
 
   await Promise.all([
-    deleteObjects({ bucket: storageBuckets.originals, keys: originalKeys }),
-    deleteObjects({ bucket: storageBuckets.derivatives, keys: derivativeKeys }),
+    deleteObjects({ bucket: buckets.originals, keys: originalKeys }),
+    deleteObjects({ bucket: buckets.derivatives, keys: derivativeKeys }),
   ]);
 
   const siteProfile = await prisma.siteProfile.findUnique({

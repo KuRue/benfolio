@@ -2,12 +2,16 @@
 
 import { useMemo, useRef, useState } from "react";
 
+import { browserPhotoInputAccept } from "@/lib/photo-files";
+
 type UploadDropzoneProps = {
+  directUploadEnabled: boolean;
+  defaultVisibility: "DRAFT" | "HIDDEN" | "PUBLIC";
   events: Array<{
     id: string;
     title: string;
     slug: string;
-    eventDate: string;
+    eventDateLabel: string;
     visibility: "DRAFT" | "HIDDEN" | "PUBLIC";
   }>;
 };
@@ -216,7 +220,11 @@ async function runWithConcurrency<T>(
   return results;
 }
 
-export function UploadDropzone({ events }: UploadDropzoneProps) {
+export function UploadDropzone({
+  directUploadEnabled,
+  defaultVisibility,
+  events,
+}: UploadDropzoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [mode, setMode] = useState<"existing" | "create">(
@@ -225,11 +233,10 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
   const [eventId, setEventId] = useState(events[0]?.id ?? "");
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventSlug, setNewEventSlug] = useState("");
-  const [newEventDate, setNewEventDate] = useState("");
   const [newEventLocation, setNewEventLocation] = useState("");
   const [newEventDescription, setNewEventDescription] = useState("");
   const [newEventVisibility, setNewEventVisibility] =
-    useState<"DRAFT" | "HIDDEN" | "PUBLIC">("DRAFT");
+    useState<"DRAFT" | "HIDDEN" | "PUBLIC">(defaultVisibility);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -294,6 +301,10 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
         throw new Error("Add at least one photo.");
       }
 
+      if (!directUploadEnabled) {
+        throw new Error("Direct uploads are disabled in settings.");
+      }
+
       const prepareResponse = await fetch("/api/admin/uploads", {
         method: "POST",
         headers: {
@@ -304,7 +315,6 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
           eventId,
           title: newEventTitle,
           slug: newEventSlug,
-          eventDate: newEventDate,
           location: newEventLocation,
           description: newEventDescription,
           visibility: newEventVisibility,
@@ -518,8 +528,8 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
 
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
-        <p className="editorial-label">Upload</p>
+        <div className="space-y-2">
+          <p className="editorial-label">Upload</p>
         <h1 className="font-serif text-4xl tracking-[-0.03em] text-white">
           Multi-file ingest.
         </h1>
@@ -555,6 +565,12 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
           </button>
         </div>
 
+      {!directUploadEnabled ? (
+        <p className="rounded-2xl border border-[#c5965c]/30 bg-[#c5965c]/10 px-4 py-3 text-sm text-[#f3d1aa]">
+          Direct uploads are disabled in settings.
+        </p>
+      ) : null}
+
         {mode === "existing" ? (
           <label className="block space-y-2">
             <span className="text-sm text-white/68">Event</span>
@@ -565,7 +581,7 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
             >
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
-                  {event.title} · {event.eventDate} · {event.visibility}
+                  {event.title} · {event.eventDateLabel} · {event.visibility}
                 </option>
               ))}
             </select>
@@ -588,15 +604,6 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
                 onChange={(event) => setNewEventSlug(event.target.value)}
                 className="admin-input"
                 placeholder="autumn-portrait-night"
-              />
-            </label>
-            <label className="block space-y-2">
-              <span className="text-sm text-white/68">Event date</span>
-              <input
-                type="date"
-                value={newEventDate}
-                onChange={(event) => setNewEventDate(event.target.value)}
-                className="admin-input"
               />
             </label>
             <label className="block space-y-2">
@@ -631,6 +638,9 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
                 className="admin-textarea"
               />
             </label>
+            <p className="text-sm text-white/48 lg:col-span-2">
+              Event dates will come from the uploaded photo timeline.
+            </p>
           </div>
         )}
 
@@ -642,19 +652,20 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
             event.preventDefault();
             replaceUploadItems(event.dataTransfer.files);
           }}
-          className="flex min-h-52 w-full flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-white/15 bg-white/3 px-6 py-10 text-center"
+          disabled={!directUploadEnabled}
+          className="flex min-h-52 w-full flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-white/15 bg-white/3 px-6 py-10 text-center disabled:cursor-not-allowed disabled:opacity-50"
         >
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept={browserPhotoInputAccept}
             multiple
             hidden
             onChange={(event) => replaceUploadItems(event.target.files)}
           />
           <span className="font-serif text-3xl text-white">Drop photos here</span>
           <span className="mt-3 text-sm text-white/56">
-            or tap to sign direct uploads into private storage
+            or tap to sign direct uploads into private storage, including DNG and ARW
           </span>
         </button>
 
@@ -754,7 +765,7 @@ export function UploadDropzone({ events }: UploadDropzoneProps) {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={busy}
+          disabled={busy || !directUploadEnabled}
           className="rounded-full bg-white px-5 py-3 text-sm font-medium text-black disabled:opacity-60"
         >
           {busy ? "Uploading directly to storage..." : "Upload originals and queue processing"}

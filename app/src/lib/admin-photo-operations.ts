@@ -6,11 +6,15 @@ import sharp from "sharp";
 
 import { enqueuePhotoProcessing } from "@/lib/queue";
 import { prisma } from "@/lib/prisma";
-import { getAutoSortedPhotoIds, getEffectiveTakenAt } from "@/lib/photo-order";
+import {
+  getAutoSortedPhotoIds,
+  getEffectiveTakenAt,
+  getEventDateRange,
+} from "@/lib/photo-order";
 import {
   deleteObjects,
   extensionFromFilename,
-  storageBuckets,
+  getStorageBuckets,
   uploadObject,
 } from "@/lib/storage";
 
@@ -125,34 +129,22 @@ async function cleanupOwnedProfileImages(
   }
 
   const keys = getProfileSlotKeys(slot, profile);
+  const buckets = await getStorageBuckets();
 
   await Promise.all([
     deleteObjects({
-      bucket: storageBuckets.originals,
+      bucket: buckets.originals,
       keys: isOwnedProfileStorageKey(slot, keys.originalKey)
         ? [keys.originalKey as string]
         : [],
     }),
     deleteObjects({
-      bucket: storageBuckets.derivatives,
+      bucket: buckets.derivatives,
       keys: isOwnedProfileStorageKey(slot, keys.displayKey)
         ? [keys.displayKey as string]
         : [],
     }),
   ]);
-}
-
-async function renumberPhotoOrderByIds(photoIds: string[]) {
-  await prisma.$transaction(
-    photoIds.map((photoId, index) =>
-      prisma.photo.update({
-        where: { id: photoId },
-        data: {
-          sortOrder: index,
-        },
-      }),
-    ),
-  );
 }
 
 function dedupePhotoIds(photoIds: string[]) {
@@ -210,6 +202,7 @@ export async function syncEventPhotoOrder(eventId: string) {
   const event = await prisma.event.findUnique({
     where: { id: eventId },
     select: {
+      createdAt: true,
       photoOrderMode: true,
     },
   });
@@ -231,6 +224,13 @@ export async function syncEventPhotoOrder(eventId: string) {
   });
 
   if (!photos.length) {
+    await prisma.event.update({
+      where: { id: eventId },
+      data: {
+        eventDate: event.createdAt,
+        eventEndDate: null,
+      },
+    });
     return;
   }
 
@@ -238,8 +238,25 @@ export async function syncEventPhotoOrder(eventId: string) {
     event.photoOrderMode === "AUTO"
       ? getAutoSortedPhotoIds(photos)
       : photos.map((photo) => photo.id);
+  const { eventDate, eventEndDate } = getEventDateRange(photos, event.createdAt);
 
-  await renumberPhotoOrderByIds(orderedIds);
+  await prisma.$transaction([
+    ...orderedIds.map((photoId, index) =>
+      prisma.photo.update({
+        where: { id: photoId },
+        data: {
+          sortOrder: index,
+        },
+      }),
+    ),
+    prisma.event.update({
+      where: { id: eventId },
+      data: {
+        eventDate,
+        eventEndDate,
+      },
+    }),
+  ]);
 }
 
 async function setFallbackEventCover(eventId: string) {
@@ -316,6 +333,7 @@ export async function storeSiteProfileImage(
   const existingProfile = await prisma.siteProfile.findUnique({
     where: { id: "default" },
   });
+  const buckets = await getStorageBuckets();
   const buffer = Buffer.from(await file.arrayBuffer());
   const extension = extensionFromFilename(file.name);
   const version = Date.now();
@@ -334,14 +352,14 @@ export async function storeSiteProfileImage(
 
   await Promise.all([
     uploadObject({
-      bucket: storageBuckets.originals,
+      bucket: buckets.originals,
       key: originalKey,
       body: buffer,
       contentType: file.type || "application/octet-stream",
       cacheControl: "private, max-age=0, no-store",
     }),
     uploadObject({
-      bucket: storageBuckets.derivatives,
+      bucket: buckets.derivatives,
       key: displayKey,
       body: displayBuffer,
       contentType: "image/webp",
@@ -668,14 +686,15 @@ export async function deletePhotoSafely(photoId: string) {
   }
 
   const derivativeKeys = photo.derivatives.map((derivative) => derivative.storageKey);
+  const buckets = await getStorageBuckets();
 
   await Promise.all([
     deleteObjects({
-      bucket: storageBuckets.originals,
+      bucket: buckets.originals,
       keys: [photo.originalKey],
     }),
     deleteObjects({
-      bucket: storageBuckets.derivatives,
+      bucket: buckets.derivatives,
       keys: derivativeKeys,
     }),
   ]);
