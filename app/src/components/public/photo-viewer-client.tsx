@@ -503,21 +503,11 @@ export function PhotoViewerClient({
           </div>
 
           {imageUrl ? (
-            // Layered progressive render:
-            //   1. dominantColor background paints with the first byte of HTML
-            //   2. blurDataUrl (inline data URL) paints on first frame
-            //   3. placeholderUrl (GRID ~960px, usually cached from event page)
-            //   4. imageUrl (VIEWER ~1800px) fades in on full decode
-            // aspect-ratio sizes the frame from server data so the layers don't
-            // reflow when each layer swaps in.
-            <div
-              className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] max-h-[calc(100dvh-0.7rem)] max-w-[calc(100vw-0.7rem)] sm:max-h-[calc(100dvh-1.2rem)] sm:max-w-[calc(100vw-1.2rem)] lg:max-h-[calc(100dvh-0.9rem)] lg:p-1.5"
-              style={{
-                aspectRatio: `${imageWidth} / ${imageHeight}`,
-                backgroundColor: dominantColor ?? undefined,
-              }}
-            >
-              <div className="relative h-full w-full overflow-hidden rounded-[1.05rem] bg-[#0c0c0c] shadow-[0_24px_90px_rgba(0,0,0,0.36)]">
+            <div className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] lg:p-1.5">
+              <div
+                className="relative overflow-hidden rounded-[1.05rem] shadow-[0_24px_90px_rgba(0,0,0,0.36)]"
+                style={{ backgroundColor: dominantColor ?? "#0c0c0c" }}
+              >
                 {blurDataUrl ? (
                   <img
                     src={blurDataUrl}
@@ -546,7 +536,7 @@ export function PhotoViewerClient({
                   decoding="async"
                   fetchPriority="high"
                   onLoad={() => setFullLoaded(true)}
-                  className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                  className={`relative z-10 max-h-[calc(100dvh-0.7rem)] w-auto max-w-[calc(100vw-0.7rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-1.2rem)] sm:max-w-[calc(100vw-1.2rem)] lg:max-h-[calc(100dvh-0.9rem)] ${
                     fullLoaded ? "opacity-100" : "opacity-0"
                   }`}
                 />
