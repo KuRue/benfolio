@@ -21,6 +21,7 @@ type SiteHeaderProps = {
     coverFocalY?: number | null;
   };
   showSearch?: boolean;
+  showLogoMark?: boolean;
 };
 
 function getLinkLabel(linkHref: string, instagramUrl: string | null) {
@@ -53,7 +54,7 @@ function buildProfileLinks(
   return links;
 }
 
-export function SiteHeader({ profile, showSearch = true }: SiteHeaderProps) {
+export function SiteHeader({ profile, showSearch = true, showLogoMark = true }: SiteHeaderProps) {
   const avatarUrl = buildDisplayUrl(profile.avatarDisplayKey);
   const coverUrl = buildDisplayUrl(profile.coverDisplayKey);
   const publicBio = profile.headline.trim() || profile.bio.trim();
@@ -76,12 +77,14 @@ export function SiteHeader({ profile, showSearch = true }: SiteHeaderProps) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_30%,_rgba(0,0,0,0.28)_100%)]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[68%] bg-gradient-to-t from-[#050505] via-[#050505]/88 to-transparent" />
 
-      <div className="absolute left-3 top-3 z-20 sm:left-4 sm:top-4">
-        <PublicSiteMark
-          displayName={profile.displayName}
-          logoDisplayKey={profile.logoDisplayKey}
-        />
-      </div>
+      {showLogoMark ? (
+        <div className="absolute left-3 top-3 z-20 sm:left-4 sm:top-4">
+          <PublicSiteMark
+            displayName={profile.displayName}
+            logoDisplayKey={profile.logoDisplayKey}
+          />
+        </div>
+      ) : null}
       {showSearch ? (
         <div className="absolute right-3 top-3 z-20 sm:right-4 sm:top-4">
           <PublicPhotoSearchLauncher

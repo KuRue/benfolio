@@ -6,6 +6,7 @@ import {
   CopyObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -13,42 +14,128 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+import type { ResolvedRuntimeSettings } from "../../../prisma/runtime-settings";
+import { getResolvedRuntimeSettings } from "@/lib/app-settings";
 import { env } from "@/lib/env";
 
-const s3 = new S3Client({
-  region: env.S3_REGION,
-  endpoint: env.S3_ENDPOINT,
-  forcePathStyle: env.S3_FORCE_PATH_STYLE,
-  credentials: {
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-  },
-});
+const globalForStorage = globalThis as typeof globalThis & {
+  __galleryStorageClients?: {
+    key: string;
+    primary: S3Client;
+    upload: S3Client;
+  };
+};
 
-// Separate client used only for generating presigned upload URLs. Two things matter here
-// that don't apply to server-side S3 calls:
-//   1. `endpoint` must be a browser-reachable origin, not an internal service name.
-//   2. Default checksum calculation must be disabled. Starting in @aws-sdk/client-s3
-//      v3.729+, PutObject hoists a placeholder `x-amz-checksum-crc32=AAAAAA==` into the
-//      signed URL at presign time. R2 (and S3) then reject the real PUT with 403 because
-//      the uploaded body's CRC32 doesn't match the zero placeholder — surfaced by Firefox
-//      as a CORS error because the 403 response has no CORS headers.
-const uploadS3 = new S3Client({
-  region: env.S3_REGION,
-  endpoint: env.S3_PUBLIC_ENDPOINT ?? env.S3_ENDPOINT,
-  forcePathStyle: env.S3_FORCE_PATH_STYLE,
-  credentials: {
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-  },
-  requestChecksumCalculation: "WHEN_REQUIRED",
-  responseChecksumValidation: "WHEN_REQUIRED",
-});
+async function getStorageRuntime(settingsOverride?: ResolvedRuntimeSettings) {
+  const settings = settingsOverride ?? (await getResolvedRuntimeSettings());
+  const clientKey = JSON.stringify({
+    endpoint: settings.storageEndpoint,
+    publicEndpoint: settings.storagePublicEndpoint,
+    region: settings.storageRegion,
+    forcePathStyle: settings.storageForcePathStyle,
+  });
 
-export const storageBuckets = {
-  originals: env.S3_BUCKET_ORIGINALS,
-  derivatives: env.S3_BUCKET_DERIVATIVES,
-} as const;
+  if (globalForStorage.__galleryStorageClients?.key !== clientKey) {
+    globalForStorage.__galleryStorageClients = {
+      key: clientKey,
+      primary: new S3Client({
+        region: settings.storageRegion,
+        endpoint: settings.storageEndpoint,
+        forcePathStyle: settings.storageForcePathStyle,
+        credentials: {
+          accessKeyId: env.S3_ACCESS_KEY_ID,
+          secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+        },
+      }),
+      upload: new S3Client({
+        region: settings.storageRegion,
+        endpoint: settings.storagePublicEndpoint,
+        forcePathStyle: settings.storageForcePathStyle,
+        credentials: {
+          accessKeyId: env.S3_ACCESS_KEY_ID,
+          secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+        },
+      }),
+    };
+  }
+
+  return {
+    s3: globalForStorage.__galleryStorageClients.primary,
+    uploadS3: globalForStorage.__galleryStorageClients.upload,
+    buckets: {
+      originals: settings.storageOriginalsBucket,
+      derivatives: settings.storageDerivativesBucket,
+    },
+    settings,
+  };
+}
+
+export async function getStorageBuckets() {
+  const { buckets } = await getStorageRuntime();
+  return buckets;
+}
+
+export async function testStorageConnection(settingsOverride?: ResolvedRuntimeSettings) {
+  const { s3, buckets, settings } = await getStorageRuntime(settingsOverride);
+
+  await Promise.all([
+    s3.send(
+      new HeadBucketCommand({
+        Bucket: buckets.originals,
+      }),
+    ),
+    s3.send(
+      new HeadBucketCommand({
+        Bucket: buckets.derivatives,
+      }),
+    ),
+  ]);
+
+  return {
+    storageEndpoint: settings.storageEndpoint,
+    storagePublicEndpoint: settings.storagePublicEndpoint,
+    originalsBucket: buckets.originals,
+    derivativesBucket: buckets.derivatives,
+  };
+}
+
+export async function runStorageDiagnostics(settingsOverride?: ResolvedRuntimeSettings) {
+  const { s3, buckets, settings } = await getStorageRuntime(settingsOverride);
+  const checks = await Promise.all(
+    [buckets.originals, buckets.derivatives].map(async (bucket) => {
+      try {
+        await s3.send(
+          new HeadBucketCommand({
+            Bucket: bucket,
+          }),
+        );
+
+        return {
+          bucket,
+          ok: true,
+          error: null,
+        };
+      } catch (error) {
+        return {
+          bucket,
+          ok: false,
+          error:
+            error instanceof Error ? error.message : "Bucket connection failed.",
+        };
+      }
+    }),
+  );
+
+  return {
+    storageEndpoint: settings.storageEndpoint,
+    storagePublicEndpoint: settings.storagePublicEndpoint,
+    originalsBucket: checks[0]?.bucket ?? buckets.originals,
+    derivativesBucket: checks[1]?.bucket ?? buckets.derivatives,
+    originalsReachable: checks[0]?.ok ?? false,
+    derivativesReachable: checks[1]?.ok ?? false,
+    errors: checks.filter((check) => !check.ok).map((check) => check.error).filter(Boolean),
+  };
+}
 
 export async function uploadObject(args: {
   bucket: string;
@@ -57,6 +144,8 @@ export async function uploadObject(args: {
   contentType: string;
   cacheControl?: string;
 }) {
+  const { s3 } = await getStorageRuntime();
+
   await s3.send(
     new PutObjectCommand({
       Bucket: args.bucket,
@@ -68,16 +157,40 @@ export async function uploadObject(args: {
   );
 }
 
+type UploadMetadataValue = string | number | boolean | null | undefined;
+
+function normalizeUploadMetadata(
+  metadata: Record<string, UploadMetadataValue> | undefined,
+) {
+  if (!metadata) {
+    return undefined;
+  }
+
+  const normalized = Object.fromEntries(
+    Object.entries(metadata)
+      .filter(([, value]) => value !== null && value !== undefined && value !== "")
+      .map(([key, value]) => [key.toLowerCase(), String(value)]),
+  );
+
+  return Object.keys(normalized).length ? normalized : undefined;
+}
+
 export async function presignUploadObject(args: {
   bucket: string;
   key: string;
   contentType: string;
+  cacheControl?: string;
   expiresInSeconds?: number;
+  metadata?: Record<string, UploadMetadataValue>;
 }) {
+  const { uploadS3 } = await getStorageRuntime();
+  const metadata = normalizeUploadMetadata(args.metadata);
   const command = new PutObjectCommand({
     Bucket: args.bucket,
     Key: args.key,
     ContentType: args.contentType,
+    CacheControl: args.cacheControl,
+    Metadata: metadata,
   });
   const url = await getSignedUrl(uploadS3, command, {
     expiresIn: args.expiresInSeconds ?? 60 * 15,
@@ -88,11 +201,20 @@ export async function presignUploadObject(args: {
     url,
     headers: {
       "Content-Type": args.contentType,
+      ...(metadata
+        ? Object.fromEntries(
+            Object.entries(metadata).map(([key, value]) => [
+              `x-amz-meta-${key}`,
+              value,
+            ]),
+          )
+        : {}),
     },
   };
 }
 
 export async function readObject(args: { bucket: string; key: string }) {
+  const { s3 } = await getStorageRuntime();
   const response = await s3.send(
     new GetObjectCommand({
       Bucket: args.bucket,
@@ -114,6 +236,7 @@ export async function readObject(args: { bucket: string; key: string }) {
 }
 
 export async function headObject(args: { bucket: string; key: string }) {
+  const { s3 } = await getStorageRuntime();
   const response = await s3.send(
     new HeadObjectCommand({
       Bucket: args.bucket,
@@ -131,6 +254,7 @@ export async function headObject(args: { bucket: string; key: string }) {
 }
 
 export async function listObjects(args: { bucket: string; prefix: string }) {
+  const { s3 } = await getStorageRuntime();
   const objects: Array<{
     key: string;
     size: number;
@@ -183,6 +307,7 @@ export async function copyObject(args: {
   destinationBucket: string;
   destinationKey: string;
 }) {
+  const { s3 } = await getStorageRuntime();
   await s3.send(
     new CopyObjectCommand({
       Bucket: args.destinationBucket,
@@ -194,6 +319,7 @@ export async function copyObject(args: {
 }
 
 export async function deleteObjects(args: { bucket: string; keys: string[] }) {
+  const { s3 } = await getStorageRuntime();
   const keys = args.keys.filter(Boolean);
 
   if (!keys.length) {
