@@ -3,6 +3,7 @@
 
 import {
   startTransition,
+  useCallback,
   useEffect,
   useEffectEvent,
   useRef,
@@ -30,6 +31,11 @@ type PhotoViewerClientProps = {
   imageUrl: string | null;
   imageWidth: number;
   imageHeight: number;
+  placeholderUrl: string | null;
+  blurDataUrl: string | null;
+  dominantColor: string | null;
+  previousImageUrl: string | null;
+  nextImageUrl: string | null;
   alt: string;
   title: string;
   subtitle: string;
@@ -139,6 +145,11 @@ export function PhotoViewerClient({
   imageUrl,
   imageWidth,
   imageHeight,
+  placeholderUrl,
+  blurDataUrl,
+  dominantColor,
+  previousImageUrl,
+  nextImageUrl,
   alt,
   title,
   subtitle,
@@ -157,9 +168,18 @@ export function PhotoViewerClient({
   const [touchLayout, setTouchLayout] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [sheetDragY, setSheetDragY] = useState(0);
+  const [fullLoaded, setFullLoaded] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const sheetTouchStartY = useRef<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
+  // Ref callback instead of useRef because cached images can finish decoding
+  // before React attaches its delegated load listener. Checking `.complete`
+  // at commit time is the only reliable way to catch that case.
+  const handleFullImageRef = useCallback((node: HTMLImageElement | null) => {
+    if (node?.complete && node.naturalWidth > 0) {
+      setFullLoaded(true);
+    }
+  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1023px), (pointer: coarse)");
@@ -183,6 +203,23 @@ export function PhotoViewerClient({
       }
     }
   }, [closeHref, eventHref, nextHref, previousHref, router]);
+
+  // Warm the browser cache for the neighbouring photos so swipe/arrow feels
+  // instant. Plain `new Image()` is enough — these URLs are WebP served with
+  // immutable cache headers, so when the user navigates the HTTP cache hits.
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    for (const url of [previousImageUrl, nextImageUrl]) {
+      if (!url) {
+        continue;
+      }
+      const preloader = new window.Image();
+      preloader.decoding = "async";
+      preloader.src = url;
+    }
+  }, [previousImageUrl, nextImageUrl]);
 
   useEffect(() => {
     if (!isModal) {
@@ -464,14 +501,54 @@ export function PhotoViewerClient({
           </div>
 
           {imageUrl ? (
-            <div className="relative flex max-h-[calc(100dvh-0.5rem)] max-w-[calc(100vw-0.5rem)] items-center justify-center rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] sm:max-h-[calc(100dvh-1rem)] sm:max-w-[calc(100vw-1rem)] lg:p-1.5">
-              <img
-                src={imageUrl}
-                width={imageWidth}
-                height={imageHeight}
-                alt={alt}
-                className="max-h-[calc(100dvh-0.7rem)] w-auto max-w-[calc(100vw-0.7rem)] rounded-[1.05rem] object-contain shadow-[0_24px_90px_rgba(0,0,0,0.36)] sm:max-h-[calc(100dvh-1.2rem)] sm:max-w-[calc(100vw-1.2rem)] lg:max-h-[calc(100dvh-0.9rem)]"
-              />
+            // Layered progressive render:
+            //   1. dominantColor background paints with the first byte of HTML
+            //   2. blurDataUrl (inline data URL) paints on first frame
+            //   3. placeholderUrl (GRID ~960px, usually cached from event page)
+            //   4. imageUrl (VIEWER ~1800px) fades in on full decode
+            // aspect-ratio sizes the frame from server data so the layers don't
+            // reflow when each layer swaps in.
+            <div
+              className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] max-h-[calc(100dvh-0.7rem)] max-w-[calc(100vw-0.7rem)] sm:max-h-[calc(100dvh-1.2rem)] sm:max-w-[calc(100vw-1.2rem)] lg:max-h-[calc(100dvh-0.9rem)] lg:p-1.5"
+              style={{
+                aspectRatio: `${imageWidth} / ${imageHeight}`,
+                backgroundColor: dominantColor ?? undefined,
+              }}
+            >
+              <div className="relative h-full w-full overflow-hidden rounded-[1.05rem] bg-[#0c0c0c] shadow-[0_24px_90px_rgba(0,0,0,0.36)]">
+                {blurDataUrl ? (
+                  <img
+                    src={blurDataUrl}
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 h-full w-full scale-[1.08] object-cover blur-[18px]"
+                  />
+                ) : null}
+                {placeholderUrl ? (
+                  <img
+                    src={placeholderUrl}
+                    alt=""
+                    aria-hidden
+                    decoding="async"
+                    className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
+                      fullLoaded ? "opacity-0" : "opacity-100"
+                    }`}
+                  />
+                ) : null}
+                <img
+                  ref={handleFullImageRef}
+                  src={imageUrl}
+                  width={imageWidth}
+                  height={imageHeight}
+                  alt={alt}
+                  decoding="async"
+                  fetchPriority="high"
+                  onLoad={() => setFullLoaded(true)}
+                  className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                    fullLoaded ? "opacity-100" : "opacity-0"
+                  }`}
+                />
+              </div>
             </div>
           ) : (
             <div className="muted-panel px-8 py-10 text-sm text-white/55">

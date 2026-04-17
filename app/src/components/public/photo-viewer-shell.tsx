@@ -14,6 +14,11 @@ type PhotoViewerShellProps = {
     imageUrl: string | null;
     imageWidth: number;
     imageHeight: number;
+    placeholderUrl: string | null;
+    blurDataUrl: string | null;
+    dominantColor: string | null;
+    previousImageUrl: string | null;
+    nextImageUrl: string | null;
     originalFilename: string;
     width: number | null;
     height: number | null;
@@ -107,6 +112,11 @@ export function PhotoViewerShell({
       imageUrl={viewer.imageUrl}
       imageWidth={viewer.imageWidth}
       imageHeight={viewer.imageHeight}
+      placeholderUrl={viewer.placeholderUrl}
+      blurDataUrl={viewer.blurDataUrl}
+      dominantColor={viewer.dominantColor}
+      previousImageUrl={viewer.previousImageUrl}
+      nextImageUrl={viewer.nextImageUrl}
       alt={viewer.altText ?? heading}
       title={heading}
       subtitle={subtitle ?? ""}

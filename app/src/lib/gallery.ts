@@ -145,6 +145,18 @@ export async function getPhotoViewerData(photoId: string) {
     return null;
   }
 
+  // Also pull the VIEWER derivative for the immediate neighbours so the client
+  // can preload them — by the time the user swipes/arrows, the bytes are cached.
+  const neighbourDerivativeSelect = {
+    id: true,
+    derivatives: {
+      where: { kind: "VIEWER" as const },
+      orderBy: { width: "desc" as const },
+      take: 1,
+      select: { storageKey: true },
+    },
+  };
+
   const [previousPhoto, nextPhoto] = await Promise.all([
     prisma.photo.findFirst({
       where: {
@@ -156,9 +168,7 @@ export async function getPhotoViewerData(photoId: string) {
       orderBy: {
         sortOrder: "desc",
       },
-      select: {
-        id: true,
-      },
+      select: neighbourDerivativeSelect,
     }),
     prisma.photo.findFirst({
       where: {
@@ -170,14 +180,16 @@ export async function getPhotoViewerData(photoId: string) {
       orderBy: {
         sortOrder: "asc",
       },
-      select: {
-        id: true,
-      },
+      select: neighbourDerivativeSelect,
     }),
   ]);
 
   const viewerDerivative = pickDerivative(photo.derivatives, "VIEWER");
   const gridDerivative = pickDerivative(photo.derivatives, "GRID");
+  const thumbnailDerivative = pickDerivative(photo.derivatives, "THUMBNAIL");
+
+  const placeholderKey =
+    gridDerivative?.storageKey ?? thumbnailDerivative?.storageKey ?? null;
 
   return {
     ...photo,
@@ -191,6 +203,11 @@ export async function getPhotoViewerData(photoId: string) {
     imageWidth: viewerDerivative?.width ?? gridDerivative?.width ?? photo.width ?? 1600,
     imageHeight:
       viewerDerivative?.height ?? gridDerivative?.height ?? photo.height ?? 2000,
+    placeholderUrl: buildDisplayUrl(placeholderKey),
+    previousImageUrl: buildDisplayUrl(
+      previousPhoto?.derivatives[0]?.storageKey ?? null,
+    ),
+    nextImageUrl: buildDisplayUrl(nextPhoto?.derivatives[0]?.storageKey ?? null),
     robotsNoIndex: photo.event.visibility === "HIDDEN",
     tags: photo.tags.map((photoTag) => photoTag.tag),
   };
