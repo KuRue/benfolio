@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 
 import { Queue, Worker } from "bullmq";
-import exifr, { thumbnail as extractEmbeddedThumbnail } from "exifr";
+// exifr is CommonJS. Under Node ESM, named imports can't be bound through
+// the CJS->ESM interop reliably, so pull `thumbnail` off the default export.
+import exifr from "exifr";
+const { thumbnail: extractEmbeddedThumbnail } = exifr;
 import { Redis } from "ioredis";
 import sharp from "sharp";
 
