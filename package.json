@@ -21,14 +21,12 @@
     "db:studio": "prisma studio --config ./prisma.config.ts",
     "postinstall": "npm run db:generate"
   },
-  "dependencies": {
-    "dotenv": "^17.2.3",
-    "prisma": "7.7.0"
-  },
   "devDependencies": {
     "@prisma/adapter-pg": "7.7.0",
     "@types/node": "^24.7.2",
+    "dotenv": "^17.2.3",
     "pg": "8.20.0",
+    "prisma": "7.7.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }
