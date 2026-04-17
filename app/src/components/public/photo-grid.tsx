@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 type Photo = {
@@ -83,6 +83,11 @@ function PhotoTile({
   returnHref?: string;
 }) {
   const [loaded, setLoaded] = useState(false);
+  const handleImageRef = useCallback((node: HTMLImageElement | null) => {
+    if (node?.complete && node.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, []);
   const href = returnHref
     ? {
         pathname: `/p/${photo.id}`,
@@ -122,6 +127,7 @@ function PhotoTile({
           <img
             src={photo.gridImageUrl}
             alt={photo.altText ?? photo.title ?? photo.caption ?? "Event photograph"}
+            ref={handleImageRef}
             loading="lazy"
             onLoad={() => setLoaded(true)}
             className={`relative z-10 h-full w-full object-cover transition duration-500 group-hover:scale-[1.025] group-hover:saturate-[1.03] ${
