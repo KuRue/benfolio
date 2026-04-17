@@ -29,7 +29,8 @@
 }
 
 html {
-  background:
+  background-color: #050505;
+  background-image:
     radial-gradient(circle at top, rgba(197, 150, 92, 0.18), transparent 22%),
     linear-gradient(180deg, #070707 0%, #050505 48%, #030303 100%);
 }

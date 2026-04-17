@@ -156,7 +156,9 @@ export function PhotoViewerClient({
   const [infoOpen, setInfoOpen] = useState(false);
   const [touchLayout, setTouchLayout] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [sheetDragY, setSheetDragY] = useState(0);
   const touchStartX = useRef<number | null>(null);
+  const sheetTouchStartY = useRef<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -181,6 +183,22 @@ export function PhotoViewerClient({
       }
     }
   }, [closeHref, eventHref, nextHref, previousHref, router]);
+
+  useEffect(() => {
+    if (!isModal) {
+      return;
+    }
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overscrollBehavior = "none";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overscrollBehavior = previousHtmlOverscroll;
+    };
+  }, [isModal]);
 
   function navigate(href: string | null) {
     if (!href) {
@@ -495,12 +513,46 @@ export function PhotoViewerClient({
               onClick={() => setInfoOpen(false)}
             />
             <div
-              className={`fixed inset-x-0 bottom-0 z-40 rounded-t-[1.8rem] border-t border-white/10 bg-[#090909]/96 px-4 pb-6 pt-4 shadow-[0_-24px_80px_rgba(0,0,0,0.4)] backdrop-blur-2xl transition-transform duration-300 ${
-                infoOpen ? "translate-y-0" : "translate-y-full"
+              className={`fixed inset-x-0 bottom-0 z-40 rounded-t-[1.8rem] border-t border-white/10 bg-[#090909]/96 px-4 pb-6 pt-2 shadow-[0_-24px_80px_rgba(0,0,0,0.4)] backdrop-blur-2xl ${
+                sheetDragY === 0 ? "transition-transform duration-300" : ""
               }`}
+              style={{
+                transform: infoOpen
+                  ? `translateY(${sheetDragY}px)`
+                  : "translateY(100%)",
+              }}
             >
-              <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/14" />
-              <div className="max-h-[60vh] overflow-y-auto px-1">
+              <div
+                className="flex cursor-grab touch-none justify-center py-3 active:cursor-grabbing"
+                onTouchStart={(event) => {
+                  sheetTouchStartY.current = event.touches[0]?.clientY ?? null;
+                }}
+                onTouchMove={(event) => {
+                  if (sheetTouchStartY.current === null) {
+                    return;
+                  }
+                  const currentY = event.touches[0]?.clientY ?? null;
+                  if (currentY === null) {
+                    return;
+                  }
+                  const delta = currentY - sheetTouchStartY.current;
+                  setSheetDragY(delta > 0 ? delta : 0);
+                }}
+                onTouchEnd={() => {
+                  if (sheetDragY > 80) {
+                    setInfoOpen(false);
+                  }
+                  setSheetDragY(0);
+                  sheetTouchStartY.current = null;
+                }}
+                onTouchCancel={() => {
+                  setSheetDragY(0);
+                  sheetTouchStartY.current = null;
+                }}
+              >
+                <div className="h-1.5 w-12 rounded-full bg-white/22" />
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto px-1 [overscroll-behavior:contain]">
                 <DetailsPanel
                   title={title}
                   subtitle={subtitle}
