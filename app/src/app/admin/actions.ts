@@ -32,6 +32,10 @@ export type EventActionState = {
   fieldErrors?: Partial<Record<"title" | "slug", string>>;
 };
 
+export type DeleteEventActionState = {
+  error?: string;
+};
+
 export type SiteProfileActionState = {
   error?: string;
   success?: string;
@@ -574,7 +578,11 @@ export async function updateEventAction(
   return {};
 }
 
-export async function deleteEventAction(eventId: string) {
+export async function deleteEventAction(
+  eventId: string,
+  _previousState: DeleteEventActionState,
+  _formData: FormData,
+): Promise<DeleteEventActionState> {
   await requireAdmin();
 
   const event = await prisma.event.findUnique({
@@ -605,54 +613,78 @@ export async function deleteEventAction(eventId: string) {
   ].filter(Boolean) as string[];
   const buckets = await getStorageBuckets();
 
-  await Promise.all([
+  // Storage failures should not block the DB delete — a stranded R2 object is
+  // recoverable, but a stuck event row is not. Log and proceed.
+  const storageResults = await Promise.allSettled([
     deleteObjects({ bucket: buckets.originals, keys: originalKeys }),
     deleteObjects({ bucket: buckets.derivatives, keys: derivativeKeys }),
   ]);
 
-  const siteProfile = await prisma.siteProfile.findUnique({
-    where: { id: "default" },
-  });
-
-  if (siteProfile) {
-    const photoOriginalKeySet = new Set(event.photos.map((photo) => photo.originalKey));
-    const photoDerivativeKeySet = new Set(
-      event.photos.flatMap((photo) =>
-        photo.derivatives.map((derivative) => derivative.storageKey),
-      ),
-    );
-
-    const clearCover =
-      photoOriginalKeySet.has(siteProfile.coverOriginalKey ?? "") ||
-      photoDerivativeKeySet.has(siteProfile.coverDisplayKey ?? "");
-    const clearAvatar =
-      photoOriginalKeySet.has(siteProfile.avatarOriginalKey ?? "") ||
-      photoDerivativeKeySet.has(siteProfile.avatarDisplayKey ?? "");
-
-    if (clearCover || clearAvatar) {
-      await prisma.siteProfile.update({
-        where: { id: "default" },
-        data: {
-          ...(clearCover
-            ? {
-                coverOriginalKey: null,
-                coverDisplayKey: null,
-              }
-            : {}),
-          ...(clearAvatar
-            ? {
-                avatarOriginalKey: null,
-                avatarDisplayKey: null,
-              }
-            : {}),
-        },
-      });
+  for (const result of storageResults) {
+    if (result.status === "rejected") {
+      console.error(
+        "[deleteEventAction] storage cleanup failed; continuing with DB delete",
+        { eventId, reason: result.reason },
+      );
     }
   }
 
-  await prisma.event.delete({
-    where: { id: eventId },
-  });
+  try {
+    const siteProfile = await prisma.siteProfile.findUnique({
+      where: { id: "default" },
+    });
+
+    if (siteProfile) {
+      const photoOriginalKeySet = new Set(event.photos.map((photo) => photo.originalKey));
+      const photoDerivativeKeySet = new Set(
+        event.photos.flatMap((photo) =>
+          photo.derivatives.map((derivative) => derivative.storageKey),
+        ),
+      );
+
+      const clearCover =
+        photoOriginalKeySet.has(siteProfile.coverOriginalKey ?? "") ||
+        photoDerivativeKeySet.has(siteProfile.coverDisplayKey ?? "");
+      const clearAvatar =
+        photoOriginalKeySet.has(siteProfile.avatarOriginalKey ?? "") ||
+        photoDerivativeKeySet.has(siteProfile.avatarDisplayKey ?? "");
+
+      if (clearCover || clearAvatar) {
+        await prisma.siteProfile.update({
+          where: { id: "default" },
+          data: {
+            ...(clearCover
+              ? {
+                  coverOriginalKey: null,
+                  coverDisplayKey: null,
+                }
+              : {}),
+            ...(clearAvatar
+              ? {
+                  avatarOriginalKey: null,
+                  avatarDisplayKey: null,
+                }
+              : {}),
+          },
+        });
+      }
+    }
+
+    await prisma.event.delete({
+      where: { id: eventId },
+    });
+  } catch (error) {
+    console.error("[deleteEventAction] database delete failed", {
+      eventId,
+      error,
+    });
+    return {
+      error:
+        error instanceof Error
+          ? `Unable to delete event: ${error.message}`
+          : "Unable to delete event.",
+    };
+  }
 
   revalidatePath("/");
   revalidatePath("/admin");

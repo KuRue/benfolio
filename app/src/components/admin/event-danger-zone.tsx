@@ -1,26 +1,21 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
-function DeleteEventButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="rounded-full border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-100 disabled:opacity-40"
-    >
-      {pending ? "Deleting..." : "Delete event"}
-    </button>
-  );
-}
+import type { DeleteEventActionState } from "@/app/admin/actions";
 
 type EventDangerZoneProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (
+    state: DeleteEventActionState,
+    formData: FormData,
+  ) => Promise<DeleteEventActionState>;
 };
 
+const initialState: DeleteEventActionState = {};
+
 export function EventDangerZone({ action }: EventDangerZoneProps) {
+  const [state, formAction, pending] = useActionState(action, initialState);
+
   return (
     <section className="admin-card space-y-5 px-6 py-6">
       <div>
@@ -34,7 +29,7 @@ export function EventDangerZone({ action }: EventDangerZoneProps) {
         and photo metadata.
       </p>
       <form
-        action={action}
+        action={formAction}
         onSubmit={(event) => {
           if (
             !window.confirm(
@@ -45,8 +40,17 @@ export function EventDangerZone({ action }: EventDangerZoneProps) {
           }
         }}
       >
-        <DeleteEventButton />
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-full border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-100 disabled:opacity-40"
+        >
+          {pending ? "Deleting..." : "Delete event"}
+        </button>
       </form>
+      {state.error ? (
+        <p className="admin-note-error">{state.error}</p>
+      ) : null}
     </section>
   );
 }

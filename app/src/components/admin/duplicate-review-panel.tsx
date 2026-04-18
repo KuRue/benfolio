@@ -62,6 +62,10 @@ type NoticeState = {
   text: string;
 } | null;
 
+type BulkKeeperRule = "oldest" | "newest";
+
+const BULK_DELETE_CHUNK_SIZE = 100;
+
 function formatDateTime(value: string | null) {
   if (!value) {
     return "Not recorded";
@@ -158,6 +162,7 @@ export function DuplicateReviewPanel({
   const [notice, setNotice] = useState<NoticeState>(null);
   const [selectedByHash, setSelectedByHash] = useState<Record<string, string[]>>({});
   const [moveTargetByHash, setMoveTargetByHash] = useState<Record<string, string>>({});
+  const [bulkKeeperRule, setBulkKeeperRule] = useState<BulkKeeperRule>("oldest");
 
   useEffect(() => {
     setSelectedByHash({});
@@ -430,6 +435,111 @@ export function DuplicateReviewPanel({
     });
   }
 
+  async function resolveAllGroups(rule: BulkKeeperRule) {
+    if (!groups.length) {
+      setNotice({
+        tone: "error",
+        text: "No duplicate groups on this page to resolve.",
+      });
+      return;
+    }
+
+    // Pick one keeper per group by the chosen rule; everything else is deleted.
+    const deleteIds: string[] = [];
+    let keeperCount = 0;
+
+    for (const group of groups) {
+      if (group.photos.length < 2) {
+        continue;
+      }
+
+      const sorted = [...group.photos].sort((a, b) => {
+        const aTime = new Date(a.createdAt).getTime();
+        const bTime = new Date(b.createdAt).getTime();
+        return rule === "oldest" ? aTime - bTime : bTime - aTime;
+      });
+
+      const keeper = sorted[0]!;
+      keeperCount += 1;
+
+      for (const photo of group.photos) {
+        if (photo.id !== keeper.id) {
+          deleteIds.push(photo.id);
+        }
+      }
+    }
+
+    if (!deleteIds.length) {
+      setNotice({
+        tone: "error",
+        text: "No duplicates to delete on this page.",
+      });
+      return;
+    }
+
+    const ruleLabel = rule === "oldest" ? "oldest (earliest uploaded)" : "newest (most recently uploaded)";
+
+    if (
+      !window.confirm(
+        `Keep the ${ruleLabel} photo in each of ${keeperCount} group${keeperCount === 1 ? "" : "s"} and delete ${deleteIds.length} duplicate${deleteIds.length === 1 ? "" : "s"} on this page? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setPendingAction("resolve-all");
+    setNotice(null);
+
+    try {
+      let deleted = 0;
+
+      for (let offset = 0; offset < deleteIds.length; offset += BULK_DELETE_CHUNK_SIZE) {
+        const chunk = deleteIds.slice(offset, offset + BULK_DELETE_CHUNK_SIZE);
+        const response = await fetch("/api/admin/photos/bulk", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "delete",
+            photoIds: chunk,
+          }),
+        });
+
+        const payload = (await response.json()) as { error?: string; message?: string };
+
+        if (!response.ok) {
+          throw new Error(
+            payload.error ??
+              `Failed to delete duplicates after removing ${deleted} of ${deleteIds.length}.`,
+          );
+        }
+
+        deleted += chunk.length;
+      }
+
+      setSelectedByHash({});
+      setMoveTargetByHash({});
+      setNotice({
+        tone: "success",
+        text: `Kept the ${rule} photo in ${keeperCount} group${keeperCount === 1 ? "" : "s"} and deleted ${deleted} duplicate${deleted === 1 ? "" : "s"}.`,
+      });
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Unable to resolve duplicate groups.",
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <section className="space-y-3">
@@ -502,6 +612,43 @@ export function DuplicateReviewPanel({
           </p>
         ) : null}
       </section>
+
+      {filters.scope === "EVENT" && groups.length > 0 ? (
+        <section className="admin-card space-y-4 px-6 py-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <p className="editorial-label">Resolve all groups on this page</p>
+              <p className="text-sm text-white/58">
+                Keep one photo per group by upload time; delete every other exact match.
+                Paginate to reach more groups.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={bulkKeeperRule}
+                onChange={(event) =>
+                  setBulkKeeperRule(event.target.value as BulkKeeperRule)
+                }
+                className="admin-select"
+                disabled={pendingAction !== null}
+              >
+                <option value="oldest">Keep oldest (earliest uploaded)</option>
+                <option value="newest">Keep newest (most recently uploaded)</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => void resolveAllGroups(bulkKeeperRule)}
+                disabled={pendingAction !== null}
+                className="rounded-full border border-red-400/30 bg-red-500/10 px-4 py-2 text-sm text-red-100 disabled:opacity-40"
+              >
+                {pendingAction === "resolve-all"
+                  ? "Resolving..."
+                  : `Resolve ${groups.length} group${groups.length === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">

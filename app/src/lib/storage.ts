@@ -318,6 +318,9 @@ export async function copyObject(args: {
   );
 }
 
+// S3 DeleteObjects API caps each request at 1000 keys.
+const DELETE_OBJECTS_BATCH_LIMIT = 1000;
+
 export async function deleteObjects(args: { bucket: string; keys: string[] }) {
   const { s3 } = await getStorageRuntime();
   const keys = args.keys.filter(Boolean);
@@ -326,15 +329,19 @@ export async function deleteObjects(args: { bucket: string; keys: string[] }) {
     return;
   }
 
-  await s3.send(
-    new DeleteObjectsCommand({
-      Bucket: args.bucket,
-      Delete: {
-        Objects: keys.map((key) => ({ Key: key })),
-        Quiet: true,
-      },
-    }),
-  );
+  for (let offset = 0; offset < keys.length; offset += DELETE_OBJECTS_BATCH_LIMIT) {
+    const chunk = keys.slice(offset, offset + DELETE_OBJECTS_BATCH_LIMIT);
+
+    await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: args.bucket,
+        Delete: {
+          Objects: chunk.map((key) => ({ Key: key })),
+          Quiet: true,
+        },
+      }),
+    );
+  }
 }
 
 export function extensionFromFilename(filename: string) {
