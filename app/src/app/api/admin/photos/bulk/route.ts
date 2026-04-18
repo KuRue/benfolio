@@ -5,9 +5,9 @@ import { z } from "zod";
 import { bulkUpdatePhotoTags } from "@/lib/admin-tags";
 import { getCurrentAdmin } from "@/lib/auth";
 import {
+  bulkDeletePhotos,
   bulkQueuePhotoReprocessing,
   bulkUpdatePhotoMetadata,
-  deletePhotoSafely,
   movePhotosToEvent,
   setEventCoverFromPhoto,
 } from "@/lib/admin-photo-operations";
@@ -85,7 +85,17 @@ function uniquePhotoIds(photoIds: string[]) {
   return [...new Set(photoIds.map((photoId) => photoId.trim()).filter(Boolean))];
 }
 
-async function loadPhotoContexts(photoIds: string[]) {
+type PhotoContext = {
+  id: string;
+  eventId: string;
+  processingState: string;
+  event: {
+    slug: string;
+    visibility: "DRAFT" | "HIDDEN" | "PUBLIC";
+  };
+};
+
+async function loadPhotoContexts(photoIds: string[]): Promise<PhotoContext[]> {
   return prisma.photo.findMany({
     where: {
       id: {
@@ -99,6 +109,7 @@ async function loadPhotoContexts(photoIds: string[]) {
       event: {
         select: {
           slug: true,
+          visibility: true,
         },
       },
     },
@@ -113,18 +124,18 @@ async function loadEventContext(eventId: string) {
     select: {
       id: true,
       slug: true,
+      visibility: true,
     },
   });
 }
 
+/**
+ * Revalidate the caches affected by a photo action. Public paths (`/` and
+ * per-event `/e/{slug}`) are only invalidated when at least one affected event
+ * is PUBLIC — editing a DRAFT event shouldn't thrash the homepage cache.
+ */
 function revalidatePhotoContexts(
-  contexts: Array<{
-    id: string;
-    eventId: string;
-    event: {
-      slug: string;
-    };
-  }>,
+  contexts: PhotoContext[],
   options?: {
     includeHomepage?: boolean;
     includeDashboard?: boolean;
@@ -133,10 +144,6 @@ function revalidatePhotoContexts(
 ) {
   revalidatePath("/admin/events");
   revalidatePath("/admin/duplicates");
-
-  if (options?.includeHomepage) {
-    revalidatePath("/");
-  }
 
   if (options?.includeDashboard) {
     revalidatePath("/admin");
@@ -147,12 +154,28 @@ function revalidatePhotoContexts(
   }
 
   const uniqueEvents = new Map(
-    contexts.map((context) => [context.eventId, context.event.slug]),
+    contexts.map((context) => [
+      context.eventId,
+      {
+        slug: context.event.slug,
+        visibility: context.event.visibility,
+      },
+    ]),
   );
 
-  for (const [eventId, eventSlug] of uniqueEvents) {
+  const anyPublic = [...uniqueEvents.values()].some(
+    (event) => event.visibility === "PUBLIC",
+  );
+
+  if (options?.includeHomepage && anyPublic) {
+    revalidatePath("/");
+  }
+
+  for (const [eventId, event] of uniqueEvents) {
     revalidatePath(`/admin/events/${eventId}`);
-    revalidatePath(`/e/${eventSlug}`);
+    if (event.visibility === "PUBLIC") {
+      revalidatePath(`/e/${event.slug}`);
+    }
   }
 
   for (const context of contexts) {
@@ -191,11 +214,15 @@ export async function POST(request: Request) {
   try {
     switch (parsed.data.action) {
       case "delete": {
-        for (const photo of photoContexts) {
-          await deletePhotoSafely(photo.id);
-        }
+        const { deletedIds } = await bulkDeletePhotos(
+          photoContexts.map((photo) => photo.id),
+        );
 
-        revalidatePhotoContexts(photoContexts, {
+        const deletedContexts = photoContexts.filter((photo) =>
+          deletedIds.includes(photo.id),
+        );
+
+        revalidatePhotoContexts(deletedContexts, {
           includeHomepage: true,
           includeDashboard: true,
           includeSettings: true,
@@ -203,12 +230,12 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
           message:
-            photoContexts.length === 1
+            deletedIds.length === 1
               ? "Photo deleted."
-              : `${photoContexts.length} photos deleted.`,
+              : `${deletedIds.length} photos deleted.`,
           summary: {
-            updatedCount: photoContexts.length,
-            skippedCount: photoIds.length - photoContexts.length,
+            updatedCount: deletedIds.length,
+            skippedCount: photoIds.length - deletedIds.length,
           },
         });
       }
@@ -322,7 +349,9 @@ export async function POST(request: Request) {
 
         if (destinationEvent) {
           revalidatePath(`/admin/events/${destinationEvent.id}`);
-          revalidatePath(`/e/${destinationEvent.slug}`);
+          if (destinationEvent.visibility === "PUBLIC") {
+            revalidatePath(`/e/${destinationEvent.slug}`);
+          }
         }
 
         return NextResponse.json({

@@ -747,6 +747,137 @@ export async function deletePhotoSafely(photoId: string) {
   }
 }
 
+/**
+ * Batch-delete photos with a single fetch + two R2 calls + one DB deleteMany.
+ *
+ * Replaces N sequential deletePhotoSafely() calls, which for 300 photos meant
+ * ~300 findUniques + ~600 R2 calls + ~300 deletes serialized end-to-end. This
+ * collapses the round-trips while preserving all the cover/siteProfile cleanup.
+ */
+export async function bulkDeletePhotos(photoIds: string[]): Promise<{
+  deletedIds: string[];
+  affectedEventIds: string[];
+}> {
+  const uniqueIds = [...new Set(photoIds)].filter(Boolean);
+  if (!uniqueIds.length) {
+    return { deletedIds: [], affectedEventIds: [] };
+  }
+
+  const photos = await prisma.photo.findMany({
+    where: { id: { in: uniqueIds } },
+    include: {
+      event: {
+        select: {
+          id: true,
+          coverOriginalKey: true,
+          coverDisplayKey: true,
+        },
+      },
+      derivatives: true,
+    },
+  });
+
+  if (!photos.length) {
+    return { deletedIds: [], affectedEventIds: [] };
+  }
+
+  const originalKeys = photos
+    .map((photo) => photo.originalKey)
+    .filter((key): key is string => Boolean(key));
+  const derivativeKeys = photos
+    .flatMap((photo) => photo.derivatives.map((derivative) => derivative.storageKey))
+    .filter((key): key is string => Boolean(key));
+
+  const buckets = await getStorageBuckets();
+
+  // Orphaned R2 objects are recoverable; stuck photo rows aren't. Log and proceed.
+  const storageResults = await Promise.allSettled([
+    deleteObjects({ bucket: buckets.originals, keys: originalKeys }),
+    deleteObjects({ bucket: buckets.derivatives, keys: derivativeKeys }),
+  ]);
+
+  for (const result of storageResults) {
+    if (result.status === "rejected") {
+      console.error(
+        "[bulkDeletePhotos] storage cleanup failed; continuing with DB delete",
+        { reason: result.reason },
+      );
+    }
+  }
+
+  const deletedIds = photos.map((photo) => photo.id);
+  await prisma.photo.deleteMany({ where: { id: { in: deletedIds } } });
+
+  // SiteProfile cleanup: one fetch, one update max, regardless of how many photos.
+  const profile = await prisma.siteProfile.findUnique({
+    where: { id: "default" },
+  });
+
+  if (profile) {
+    const originalKeySet = new Set(originalKeys);
+    const derivativeKeySet = new Set(derivativeKeys);
+
+    const clearCover =
+      (profile.coverOriginalKey !== null &&
+        originalKeySet.has(profile.coverOriginalKey)) ||
+      (profile.coverDisplayKey !== null &&
+        derivativeKeySet.has(profile.coverDisplayKey));
+    const clearAvatar =
+      (profile.avatarOriginalKey !== null &&
+        originalKeySet.has(profile.avatarOriginalKey)) ||
+      (profile.avatarDisplayKey !== null &&
+        derivativeKeySet.has(profile.avatarDisplayKey));
+
+    if (clearCover || clearAvatar) {
+      await prisma.siteProfile.update({
+        where: { id: "default" },
+        data: {
+          ...(clearCover
+            ? { coverOriginalKey: null, coverDisplayKey: null }
+            : {}),
+          ...(clearAvatar
+            ? { avatarOriginalKey: null, avatarDisplayKey: null }
+            : {}),
+        },
+      });
+    }
+  }
+
+  // Per-unique-event work: sync order once, re-pick event cover only if we
+  // actually removed the current cover photo.
+  const affectedEventIds = [...new Set(photos.map((photo) => photo.eventId))];
+
+  const eventsNeedingFallbackCover = affectedEventIds.filter((eventId) => {
+    const eventPhotos = photos.filter((photo) => photo.eventId === eventId);
+    const event = eventPhotos[0]?.event;
+    if (!event) {
+      return false;
+    }
+
+    return eventPhotos.some((photo) => {
+      if (event.coverOriginalKey === photo.originalKey) {
+        return true;
+      }
+      if (!event.coverDisplayKey) {
+        return false;
+      }
+      return photo.derivatives.some(
+        (derivative) => derivative.storageKey === event.coverDisplayKey,
+      );
+    });
+  });
+
+  await Promise.all(
+    affectedEventIds.map((eventId) => syncEventPhotoOrder(eventId)),
+  );
+
+  await Promise.all(
+    eventsNeedingFallbackCover.map((eventId) => setFallbackEventCover(eventId)),
+  );
+
+  return { deletedIds, affectedEventIds };
+}
+
 export async function movePhotosToEvent(args: {
   photoIds: string[];
   destinationEventId: string;
