@@ -29,10 +29,22 @@ export async function generateMetadata({
     };
   }
 
+  const title = viewer.title ?? viewer.event.title;
+  const description =
+    viewer.caption ?? `Canonical photo route for ${viewer.event.title}.`;
+  const ogImages = viewer.imageUrl
+    ? [
+        {
+          url: absoluteUrl(viewer.imageUrl),
+          width: viewer.imageWidth,
+          height: viewer.imageHeight,
+        },
+      ]
+    : undefined;
+
   return {
-    title: viewer.title ?? viewer.event.title,
-    description:
-      viewer.caption ?? `Canonical photo route for ${viewer.event.title}.`,
+    title,
+    description,
     alternates: {
       canonical: `/p/${viewer.id}`,
     },
@@ -44,19 +56,16 @@ export async function generateMetadata({
       : undefined,
     openGraph: {
       type: "article",
-      title: viewer.title ?? viewer.event.title,
-      description:
-        viewer.caption ?? `Canonical photo route for ${viewer.event.title}.`,
+      title,
+      description,
       url: absoluteUrl(`/p/${viewer.id}`),
-      images: viewer.imageUrl
-        ? [
-            {
-              url: absoluteUrl(viewer.imageUrl),
-              width: viewer.imageWidth,
-              height: viewer.imageHeight,
-            },
-          ]
-        : undefined,
+      images: ogImages,
+    },
+    twitter: {
+      card: viewer.imageUrl ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: ogImages,
     },
   };
 }

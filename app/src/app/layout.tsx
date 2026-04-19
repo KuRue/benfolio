@@ -3,6 +3,7 @@ import { Cormorant_Garamond, Manrope } from "next/font/google";
 import "./globals.css";
 
 import { getSiteProfile } from "@/lib/gallery";
+import { buildDisplayUrl } from "@/lib/storage";
 
 const bodyFont = Manrope({
   variable: "--font-body",
@@ -29,15 +30,21 @@ export async function generateMetadata(): Promise<Metadata> {
   let siteName = "Photography";
   let headline = "";
   let hasLogo = false;
+  let shareImageUrl: string | null = null;
 
   try {
     const siteProfile = await getSiteProfile();
     siteName = siteProfile.displayName;
     headline = siteProfile.headline;
     hasLogo = Boolean(siteProfile.logoDisplayKey);
+    shareImageUrl =
+      buildDisplayUrl(siteProfile.coverDisplayKey) ??
+      buildDisplayUrl(siteProfile.avatarDisplayKey);
   } catch {
     // Database unavailable during static prerender (e.g. not-found page at build time).
   }
+
+  const ogImages = shareImageUrl ? [{ url: shareImageUrl }] : undefined;
 
   return {
     metadataBase,
@@ -56,8 +63,16 @@ export async function generateMetadata(): Promise<Metadata> {
       : undefined,
     openGraph: {
       type: "website",
+      siteName,
       title: siteName,
       description: headline || undefined,
+      images: ogImages,
+    },
+    twitter: {
+      card: shareImageUrl ? "summary_large_image" : "summary",
+      title: siteName,
+      description: headline || undefined,
+      images: ogImages,
     },
   };
 }

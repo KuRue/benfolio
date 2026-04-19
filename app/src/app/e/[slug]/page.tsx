@@ -32,12 +32,14 @@ export async function generateMetadata({
   }
 
   const image = buildDisplayUrl(event.coverDisplayKey);
+  const description =
+    event.description ??
+    `A curated event gallery from ${formatDateRange(event.eventDate, event.eventEndDate)}.`;
+  const ogImages = image ? [{ url: absoluteUrl(image) }] : undefined;
 
   return {
     title: event.title,
-    description:
-      event.description ??
-      `A curated event gallery from ${formatDateRange(event.eventDate, event.eventEndDate)}.`,
+    description,
     alternates: {
       canonical: `/e/${event.slug}`,
     },
@@ -51,11 +53,15 @@ export async function generateMetadata({
     openGraph: {
       type: "article",
       title: event.title,
-      description:
-        event.description ??
-        `A curated event gallery from ${formatDateRange(event.eventDate, event.eventEndDate)}.`,
+      description,
       url: absoluteUrl(`/e/${event.slug}`),
-      images: image ? [{ url: absoluteUrl(image) }] : undefined,
+      images: ogImages,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: event.title,
+      description,
+      images: ogImages,
     },
   };
 }
