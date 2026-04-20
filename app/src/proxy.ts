@@ -57,7 +57,16 @@ function generateVisitorId(): string {
 }
 
 export function proxy(request: NextRequest) {
-  const response = NextResponse.next();
+  // Stamp the current pathname onto the request headers so server
+  // components can read it (Next doesn't expose the current URL to RSCs
+  // any other way). Analytics uses this to record the *landing path* a
+  // referred visitor hit. Stripped to pathname — no query string.
+  const forwardedHeaders = new Headers(request.headers);
+  forwardedHeaders.set("x-bf-path", request.nextUrl.pathname);
+
+  const response = NextResponse.next({
+    request: { headers: forwardedHeaders },
+  });
 
   // Only issue cookies to likely-human GET requests on public pages. The
   // matcher below already excludes api/_next/static, but we also skip the

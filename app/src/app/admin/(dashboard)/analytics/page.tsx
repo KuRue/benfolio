@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   getAnalyticsSummary,
   getMostViewedPhotos,
+  getTopReferrers,
   getUniqueVisitorsByDay,
 } from "@/lib/admin-analytics";
 
@@ -24,11 +25,14 @@ function formatNumber(value: number): string {
 }
 
 export default async function AdminAnalyticsPage() {
-  const [summary, visitorsSeries, topPhotos] = await Promise.all([
+  const [summary, visitorsSeries, topPhotos, topReferrers] = await Promise.all([
     getAnalyticsSummary(),
     getUniqueVisitorsByDay(30),
     getMostViewedPhotos(25),
+    getTopReferrers(15, 30),
   ]);
+
+  const topReferrerCount = topReferrers[0]?.visitors ?? 0;
 
   const peakDailyVisitors = visitorsSeries.reduce(
     (peak, point) => Math.max(peak, point.visitors),
@@ -124,6 +128,79 @@ export default async function AdminAnalyticsPage() {
               </span>
             </div>
           </div>
+        )}
+      </section>
+
+      <section className="admin-card space-y-4 px-5 py-5 sm:px-6 sm:py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1.5">
+            <p className="editorial-label">Traffic sources</p>
+            <h2 className="font-serif text-[1.85rem] tracking-[-0.03em] text-white">
+              Where they came from
+            </h2>
+            <p className="text-sm text-white/52">
+              {summary.referredVisitorsLast30 > 0
+                ? `${formatNumber(summary.referredVisitorsLast30)} referred visit${summary.referredVisitorsLast30 === 1 ? "" : "s"} from ${formatNumber(summary.uniqueReferrerHostsLast30)} source${summary.uniqueReferrerHostsLast30 === 1 ? "" : "s"} in the last 30 days.`
+                : "No external referrals tracked yet. Direct loads and same-origin navigation are excluded."}
+            </p>
+          </div>
+          <p className="text-xs uppercase tracking-[0.22em] text-white/40">
+            30 days · unique visitors
+          </p>
+        </div>
+
+        {topReferrers.length === 0 ? (
+          <p className="text-sm text-white/52">
+            Referrals will show up here once someone clicks a link to the
+            site from Discord, a tweet, another blog, etc.
+          </p>
+        ) : (
+          <ol className="grid gap-2">
+            {topReferrers.map((ref, index) => {
+              const barPct =
+                topReferrerCount === 0
+                  ? 0
+                  : (ref.visitors / topReferrerCount) * 100;
+              return (
+                <li
+                  key={ref.referrerHost}
+                  className="rounded-[1rem] border border-white/8 bg-white/[0.03] px-3 py-2.5"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 shrink-0 text-right font-serif text-base text-white/48">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="truncate text-sm text-white">
+                          {ref.referrerHost}
+                        </p>
+                        <p className="shrink-0 font-serif text-lg leading-none tracking-[-0.02em] text-white">
+                          {formatNumber(ref.visitors)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/8">
+                          <div
+                            className="h-full rounded-full bg-white/70"
+                            style={{ width: `${barPct}%` }}
+                          />
+                        </div>
+                        <p className="shrink-0 text-[0.68rem] uppercase tracking-[0.22em] text-white/40">
+                          {ref.topLandingPath
+                            ? `→ ${ref.topLandingPath}${ref.topLandingPathCount > 1 ? ` (${formatNumber(ref.topLandingPathCount)})` : ""}`
+                            : ""}
+                          {ref.visitorsLast7 > 0
+                            ? `${ref.topLandingPath ? " · " : ""}+${formatNumber(ref.visitorsLast7)} (7d)`
+                            : ""}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         )}
       </section>
 

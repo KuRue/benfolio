@@ -420,6 +420,26 @@ model SiteVisitorDay {
   @@index([day])
 }
 
+/// Per-(visitor, day, source) referral record. Captures the external host
+/// that sent a visitor to the site so the admin analytics page can show a
+/// "top traffic sources" leaderboard. Internal (same-origin) navigations
+/// and direct loads (no Referer) are not recorded.
+///
+/// Dedupe policy matches SiteVisitorDay: one visitor arriving from
+/// t.co five times in one day counts once. A visitor arriving from
+/// both t.co and discord.com on the same day produces two rows.
+model ReferralVisit {
+  visitorId    String   @db.VarChar(64)
+  day          DateTime @db.Date
+  referrerHost String   @db.VarChar(253)
+  landingPath  String   @db.VarChar(512)
+  firstSeenAt  DateTime @default(now())
+
+  @@id([visitorId, day, referrerHost])
+  @@index([day, referrerHost])
+  @@index([referrerHost])
+}
+
 model AdminUser {
   id           String      @id @default(cuid())
   displayName  String

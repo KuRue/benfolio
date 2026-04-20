@@ -166,12 +166,91 @@ export async function getUniqueVisitorsByDay(
   return result;
 }
 
+export type TopReferrer = {
+  referrerHost: string;
+  visitors: number;
+  visitorsLast7: number;
+  topLandingPath: string | null;
+  topLandingPathCount: number;
+};
+
+/**
+ * Top external traffic sources by unique visitor-days. Same dedupe as
+ * visitor counts: one visitor from t.co on the same day counts once, so
+ * the number is "unique visitors referred by this host in the window".
+ *
+ * `topLandingPath` is the most common page a visitor from that host
+ * landed on — usually a shared photo URL, which makes the leaderboard
+ * actually useful ("3 people came to /p/abc from Discord").
+ */
+export async function getTopReferrers(
+  limit = 15,
+  windowDays = 30,
+): Promise<TopReferrer[]> {
+  const since = daysAgoUtc(windowDays - 1);
+  const since7 = daysAgoUtc(6);
+
+  const [hostGroups, recentHostGroups, landingGroups] = await Promise.all([
+    prisma.referralVisit.groupBy({
+      by: ["referrerHost"],
+      where: { day: { gte: since } },
+      _count: { visitorId: true },
+      orderBy: { _count: { visitorId: "desc" } },
+      take: limit,
+    }),
+    prisma.referralVisit.groupBy({
+      by: ["referrerHost"],
+      where: { day: { gte: since7 } },
+      _count: { visitorId: true },
+    }),
+    prisma.referralVisit.groupBy({
+      by: ["referrerHost", "landingPath"],
+      where: { day: { gte: since } },
+      _count: { visitorId: true },
+    }),
+  ]);
+
+  if (hostGroups.length === 0) return [];
+
+  const recentByHost = new Map<string, number>(
+    recentHostGroups.map((row) => [row.referrerHost, row._count.visitorId]),
+  );
+
+  // For each host, pick the landing path with the highest visitor count.
+  const topLandingByHost = new Map<
+    string,
+    { path: string; count: number }
+  >();
+  for (const row of landingGroups) {
+    const best = topLandingByHost.get(row.referrerHost);
+    if (!best || row._count.visitorId > best.count) {
+      topLandingByHost.set(row.referrerHost, {
+        path: row.landingPath,
+        count: row._count.visitorId,
+      });
+    }
+  }
+
+  return hostGroups.map((row) => {
+    const landing = topLandingByHost.get(row.referrerHost);
+    return {
+      referrerHost: row.referrerHost,
+      visitors: row._count.visitorId,
+      visitorsLast7: recentByHost.get(row.referrerHost) ?? 0,
+      topLandingPath: landing?.path ?? null,
+      topLandingPathCount: landing?.count ?? 0,
+    } satisfies TopReferrer;
+  });
+}
+
 export type AnalyticsSummary = {
   totalPhotoViews: number;
   totalUniqueVisitors: number;
   uniqueVisitorsToday: number;
   uniqueVisitorsLast7: number;
   uniqueVisitorsLast30: number;
+  referredVisitorsLast30: number;
+  uniqueReferrerHostsLast30: number;
 };
 
 export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
@@ -185,6 +264,7 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
     visitorsToday,
     visitorsLast7,
     visitorsLast30,
+    referralHostGroupsLast30,
   ] = await Promise.all([
     prisma.photoView.count(),
     // All-time unique visitors: distinct visitorId across SiteVisitorDay.
@@ -204,7 +284,17 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
         where: { day: { gte: since30 } },
       })
       .then((rows) => rows.length),
+    prisma.referralVisit.groupBy({
+      by: ["referrerHost"],
+      where: { day: { gte: since30 } },
+      _count: { visitorId: true },
+    }),
   ]);
+
+  const referredVisitorsLast30 = referralHostGroupsLast30.reduce(
+    (sum, row) => sum + row._count.visitorId,
+    0,
+  );
 
   return {
     totalPhotoViews,
@@ -212,5 +302,7 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
     uniqueVisitorsToday: visitorsToday,
     uniqueVisitorsLast7: visitorsLast7,
     uniqueVisitorsLast30: visitorsLast30,
+    referredVisitorsLast30,
+    uniqueReferrerHostsLast30: referralHostGroupsLast30.length,
   };
 }
