@@ -1,6 +1,7 @@
 import "server-only";
 
 import { ImageResponse } from "next/og";
+import sharp from "sharp";
 
 import { getSiteProfile } from "@/lib/gallery";
 import { prisma } from "@/lib/prisma";
@@ -12,14 +13,24 @@ export const HOMEPAGE_OG_CONTENT_TYPE = "image/png";
 
 const TILE_CELLS = 4; // 2 × 2 grid
 
+// Tile cells render at ~600px wide in the final 1200×630 collage. Resize
+// down to 1200px (just enough for 2× density on the full-bleed fallback)
+// and transcode to JPEG — satori/@vercel/og advertises WebP support in
+// its accept list but trips on actual decoding, which manifested as a
+// fast 502 mid-stream. JPEG bytes are also smaller than WebP for this
+// size, so we gain on payload as well.
 async function readDerivativeAsDataUrl(key: string): Promise<string | null> {
   try {
     const buckets = await getStorageBuckets();
-    const { body, contentType } = await readObject({
+    const { body } = await readObject({
       bucket: buckets.derivatives,
       key,
     });
-    return `data:${contentType};base64,${body.toString("base64")}`;
+    const jpeg = await sharp(body)
+      .resize({ width: 1200, withoutEnlargement: true })
+      .jpeg({ quality: 80, mozjpeg: true })
+      .toBuffer();
+    return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
   } catch (error) {
     console.error("[og-image] failed to read derivative", { key, error });
     return null;
