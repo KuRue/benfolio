@@ -12,30 +12,8 @@ export const HOMEPAGE_OG_SIZE = { width: 1200, height: 630 };
 export const HOMEPAGE_OG_CONTENT_TYPE = "image/png";
 
 const TILE_CELLS = 4; // 2 × 2 grid
-
-// Tile cells render at ~600px wide in the final 1200×630 collage. Resize
-// down to 1200px (just enough for 2× density on the full-bleed fallback)
-// and transcode to JPEG — satori/@vercel/og advertises WebP support in
-// its accept list but trips on actual decoding, which manifested as a
-// fast 502 mid-stream. JPEG bytes are also smaller than WebP for this
-// size, so we gain on payload as well.
-async function readDerivativeAsDataUrl(key: string): Promise<string | null> {
-  try {
-    const buckets = await getStorageBuckets();
-    const { body } = await readObject({
-      bucket: buckets.derivatives,
-      key,
-    });
-    const jpeg = await sharp(body)
-      .resize({ width: 1200, withoutEnlargement: true })
-      .jpeg({ quality: 80, mozjpeg: true })
-      .toBuffer();
-    return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
-  } catch (error) {
-    console.error("[og-image] failed to read derivative", { key, error });
-    return null;
-  }
-}
+const TILE_WIDTH = HOMEPAGE_OG_SIZE.width / 2;
+const TILE_HEIGHT = HOMEPAGE_OG_SIZE.height / 2;
 
 // Rank by how well the derivative matches our ~600px tile render size.
 // GRID (960px) is the sweet spot; THUMBNAIL (320px) is a touch soft but
@@ -48,7 +26,97 @@ const KIND_PRIORITY: Record<string, number> = {
   VIEWER: 2,
 };
 
-async function collectTileSources(): Promise<string[]> {
+type TileSource = {
+  key: string;
+  // Focal point as percentages 0-100 (center = 50), matching the CSS
+  // object-position semantics used on /e/[slug] and EventCard.
+  focalX: number;
+  focalY: number;
+};
+
+/**
+ * Focal-aware crop + JPEG transcode. Satori/@vercel/og advertises WebP
+ * support in its accept list but trips on actual decoding (manifested as
+ * a fast 502 mid-stream), and its objectFit/objectPosition handling is
+ * limited — so we do the cropping in sharp instead and hand satori a
+ * pre-sized JPEG tile.
+ */
+async function readDerivativeAsTileJpeg(
+  src: TileSource,
+  target: { width: number; height: number },
+): Promise<string | null> {
+  try {
+    const buckets = await getStorageBuckets();
+    const { body } = await readObject({
+      bucket: buckets.derivatives,
+      key: src.key,
+    });
+
+    const meta = await sharp(body).metadata();
+    const sourceWidth = meta.width ?? 0;
+    const sourceHeight = meta.height ?? 0;
+
+    // If we don't have dimensions for some reason, fall back to a plain
+    // cover-fit resize with centered gravity.
+    if (!sourceWidth || !sourceHeight) {
+      const jpeg = await sharp(body)
+        .resize({
+          width: target.width,
+          height: target.height,
+          fit: "cover",
+          position: "centre",
+        })
+        .jpeg({ quality: 80, mozjpeg: true })
+        .toBuffer();
+      return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
+    }
+
+    // Compute a focal-point-aware extract box: find the largest rect of
+    // the target aspect ratio that fits inside the source, then slide it
+    // toward (focalX, focalY). This mirrors what browsers do for
+    // `object-fit: cover; object-position: X% Y%`.
+    const targetAspect = target.width / target.height;
+    const sourceAspect = sourceWidth / sourceHeight;
+
+    let cropW: number;
+    let cropH: number;
+    if (sourceAspect > targetAspect) {
+      cropH = sourceHeight;
+      cropW = Math.round(sourceHeight * targetAspect);
+    } else {
+      cropW = sourceWidth;
+      cropH = Math.round(sourceWidth / targetAspect);
+    }
+
+    const maxOffsetX = Math.max(0, sourceWidth - cropW);
+    const maxOffsetY = Math.max(0, sourceHeight - cropH);
+    const focalX = Math.min(100, Math.max(0, src.focalX)) / 100;
+    const focalY = Math.min(100, Math.max(0, src.focalY)) / 100;
+    const left = Math.round(maxOffsetX * focalX);
+    const top = Math.round(maxOffsetY * focalY);
+
+    const jpeg = await sharp(body)
+      .extract({
+        left,
+        top,
+        width: Math.min(cropW, sourceWidth - left),
+        height: Math.min(cropH, sourceHeight - top),
+      })
+      .resize({ width: target.width, height: target.height })
+      .jpeg({ quality: 80, mozjpeg: true })
+      .toBuffer();
+
+    return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
+  } catch (error) {
+    console.error("[og-image] failed to read derivative", {
+      key: src.key,
+      error,
+    });
+    return null;
+  }
+}
+
+async function collectTileSources(): Promise<TileSource[]> {
   const events = await prisma.event.findMany({
     where: {
       visibility: "PUBLIC",
@@ -56,7 +124,12 @@ async function collectTileSources(): Promise<string[]> {
     },
     orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
     take: TILE_CELLS,
-    select: { coverOriginalKey: true, coverDisplayKey: true },
+    select: {
+      coverOriginalKey: true,
+      coverDisplayKey: true,
+      coverFocalX: true,
+      coverFocalY: true,
+    },
   });
 
   const originalKeys = events
@@ -90,35 +163,37 @@ async function collectTileSources(): Promise<string[]> {
 
   // Preserve event ordering; fall back to the event's coverDisplayKey
   // (VIEWER) if the photo row has no derivatives for some reason.
-  const keys: string[] = [];
+  const sources: TileSource[] = [];
   for (const event of events) {
     const original = event.coverOriginalKey;
     if (!original) continue;
     const smaller = byOriginal.get(original);
-    if (smaller) {
-      keys.push(smaller);
-    } else if (event.coverDisplayKey) {
-      keys.push(event.coverDisplayKey);
-    }
+    const key = smaller ?? event.coverDisplayKey;
+    if (!key) continue;
+    sources.push({
+      key,
+      focalX: event.coverFocalX ?? 50,
+      focalY: event.coverFocalY ?? 50,
+    });
   }
 
   // Fall back to the SiteProfile cover when there are no public events yet.
-  if (!keys.length) {
+  if (!sources.length) {
     try {
       const profile = await getSiteProfile();
       if (profile.coverDisplayKey) {
-        keys.push(profile.coverDisplayKey);
+        sources.push({
+          key: profile.coverDisplayKey,
+          focalX: profile.coverFocalX ?? 50,
+          focalY: profile.coverFocalY ?? 50,
+        });
       }
     } catch {
       // Database unavailable — ship the blank fallback.
     }
   }
 
-  const sources = await Promise.all(
-    keys.map((key) => readDerivativeAsDataUrl(key)),
-  );
-
-  return sources.filter((src): src is string => Boolean(src));
+  return sources;
 }
 
 /**
@@ -131,10 +206,10 @@ async function collectTileSources(): Promise<string[]> {
  * reliably across X, Discord, Slack, and iMessage.
  */
 export async function generateHomepageOgImage(): Promise<ImageResponse> {
-  const sources = await collectTileSources();
+  const tileSources = await collectTileSources();
   const background = "#050505";
 
-  if (!sources.length) {
+  if (!tileSources.length) {
     return new ImageResponse(
       (
         <div
@@ -150,7 +225,26 @@ export async function generateHomepageOgImage(): Promise<ImageResponse> {
     );
   }
 
-  if (sources.length === 1) {
+  if (tileSources.length === 1) {
+    const fullBleed = await readDerivativeAsTileJpeg(
+      tileSources[0]!,
+      HOMEPAGE_OG_SIZE,
+    );
+    if (!fullBleed) {
+      return new ImageResponse(
+        (
+          <div
+            style={{
+              display: "flex",
+              width: "100%",
+              height: "100%",
+              background,
+            }}
+          />
+        ),
+        { ...HOMEPAGE_OG_SIZE },
+      );
+    }
     return new ImageResponse(
       (
         <div
@@ -162,14 +256,9 @@ export async function generateHomepageOgImage(): Promise<ImageResponse> {
           }}
         >
           <img
-            src={sources[0]!}
+            src={fullBleed}
             width={HOMEPAGE_OG_SIZE.width}
             height={HOMEPAGE_OG_SIZE.height}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
           />
         </div>
       ),
@@ -178,12 +267,18 @@ export async function generateHomepageOgImage(): Promise<ImageResponse> {
   }
 
   // 2+ sources → fill the 2×2 grid, cycling when there are fewer than 4.
-  const tiles = Array.from({ length: TILE_CELLS }).map(
-    (_, index) => sources[index % sources.length]!,
+  const tileSlots = Array.from({ length: TILE_CELLS }).map(
+    (_, index) => tileSources[index % tileSources.length]!,
   );
 
-  const tileWidth = HOMEPAGE_OG_SIZE.width / 2;
-  const tileHeight = HOMEPAGE_OG_SIZE.height / 2;
+  const tiles = await Promise.all(
+    tileSlots.map((src) =>
+      readDerivativeAsTileJpeg(src, {
+        width: TILE_WIDTH,
+        height: TILE_HEIGHT,
+      }),
+    ),
+  );
 
   return new ImageResponse(
     (
@@ -201,21 +296,14 @@ export async function generateHomepageOgImage(): Promise<ImageResponse> {
             key={index}
             style={{
               display: "flex",
-              width: tileWidth,
-              height: tileHeight,
+              width: TILE_WIDTH,
+              height: TILE_HEIGHT,
               overflow: "hidden",
             }}
           >
-            <img
-              src={src}
-              width={tileWidth}
-              height={tileHeight}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
-            />
+            {src ? (
+              <img src={src} width={TILE_WIDTH} height={TILE_HEIGHT} />
+            ) : null}
           </div>
         ))}
       </div>
