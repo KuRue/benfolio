@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PhotoViewerShell } from "@/components/public/photo-viewer-shell";
+import { trackPhotoView } from "@/lib/analytics";
 import { getPhotoViewerData } from "@/lib/gallery";
 import { absoluteUrl } from "@/lib/strings";
 
@@ -73,7 +74,10 @@ export async function generateMetadata({
 export default async function PhotoPage({ params, searchParams }: PhotoPageProps) {
   const { id } = await params;
   const { from } = await searchParams;
-  const viewer = await getPhotoViewerData(id);
+  const [viewer] = await Promise.all([
+    getPhotoViewerData(id),
+    trackPhotoView(id),
+  ]);
 
   if (!viewer) {
     notFound();

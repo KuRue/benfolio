@@ -204,6 +204,7 @@ model Photo {
   tags               PhotoTag[]
   externalLinks      ExternalAssetLink[]
   importItems        ImportItem[]
+  views              PhotoView[]
 
   @@index([eventId, sortOrder])
   @@index([eventId, capturedAt])
@@ -390,6 +391,33 @@ model WorkerHeartbeat {
   lastImportProcessedAt DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+}
+
+/// Per-visitor-per-day photo view. Primary key dedupes so refreshing a
+/// photo three times in the same day counts as one view.
+model PhotoView {
+  photoId       String
+  visitorId     String   @db.VarChar(64)
+  day           DateTime @db.Date
+  firstViewedAt DateTime @default(now())
+  photo         Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@id([photoId, visitorId, day])
+  @@index([photoId])
+  @@index([day])
+}
+
+/// Per-visitor-per-day site visit. One row per unique visitor per day,
+/// used for the "unique visitors per day" metric on the admin analytics
+/// page. Independent of PhotoView because a visitor may land on the
+/// homepage and never open a photo.
+model SiteVisitorDay {
+  visitorId   String   @db.VarChar(64)
+  day         DateTime @db.Date
+  firstSeenAt DateTime @default(now())
+
+  @@id([visitorId, day])
+  @@index([day])
 }
 
 model AdminUser {

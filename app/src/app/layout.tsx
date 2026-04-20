@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import "./globals.css";
 
+import { trackSiteVisit } from "@/lib/analytics";
 import { getSiteProfile } from "@/lib/gallery";
 
 const bodyFont = Manrope({
@@ -71,13 +72,17 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
   modal,
 }: Readonly<{
   children: React.ReactNode;
   modal: React.ReactNode;
 }>) {
+  // Fire-and-forget: record this visitor-day. No-ops for bots (no cookie)
+  // and authenticated admins previewing their own site.
+  await trackSiteVisit();
+
   return (
     <html
       lang="en"

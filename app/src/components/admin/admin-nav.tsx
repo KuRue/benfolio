@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin/duplicates", label: "Duplicates" },
   { href: "/admin/imports", label: "Imports" },
   { href: "/admin/uploads", label: "Uploads" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/settings", label: "Settings" },
 ];
 

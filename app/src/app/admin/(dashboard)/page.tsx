@@ -1,13 +1,19 @@
 import Link from "next/link";
 
 import { SystemStatusPanel } from "@/components/admin/system-status-panel";
+import {
+  getAnalyticsSummary,
+  getMostViewedPhotos,
+} from "@/lib/admin-analytics";
 import { getAdminDashboardData } from "@/lib/admin-data";
 import { getSystemDiagnostics } from "@/lib/system-status";
 
 export default async function AdminOverviewPage() {
-  const [dashboard, diagnostics] = await Promise.all([
+  const [dashboard, diagnostics, analyticsSummary, topPhotos] = await Promise.all([
     getAdminDashboardData(),
     getSystemDiagnostics(),
+    getAnalyticsSummary(),
+    getMostViewedPhotos(5),
   ]);
 
   const cards = [
@@ -73,6 +79,67 @@ export default async function AdminOverviewPage() {
           warnings: diagnostics.warnings,
         }}
       />
+
+      <section className="admin-card space-y-4 px-5 py-5 sm:px-6 sm:py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1.5">
+            <p className="editorial-label">Audience</p>
+            <h2 className="font-serif text-[1.85rem] tracking-[-0.03em] text-white">
+              Most viewed
+            </h2>
+            <p className="text-sm text-white/52">
+              {analyticsSummary.uniqueVisitorsToday.toLocaleString("en-US")}{" "}
+              visitor
+              {analyticsSummary.uniqueVisitorsToday === 1 ? "" : "s"} today ·{" "}
+              {analyticsSummary.uniqueVisitorsLast7.toLocaleString("en-US")} in
+              the last 7 days
+            </p>
+          </div>
+          <Link href="/admin/analytics" className="admin-button-muted">
+            Open analytics
+          </Link>
+        </div>
+
+        {topPhotos.length === 0 ? (
+          <p className="text-sm text-white/52">
+            No photo views tracked yet.
+          </p>
+        ) : (
+          <ol className="grid gap-2">
+            {topPhotos.map((photo, index) => {
+              const label =
+                photo.title ??
+                photo.caption ??
+                photo.altText ??
+                `Photo ${photo.id}`;
+              return (
+                <li
+                  key={photo.id}
+                  className="rounded-[1rem] border border-white/8 bg-white/[0.03]"
+                >
+                  <Link
+                    href={`/p/${photo.id}`}
+                    className="flex items-center gap-3 px-3 py-2"
+                  >
+                    <span className="w-6 shrink-0 text-right font-serif text-base text-white/48">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-white">{label}</p>
+                      <p className="truncate text-[0.68rem] uppercase tracking-[0.22em] text-white/40">
+                        {photo.event.title}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-serif text-base leading-none tracking-[-0.02em] text-white">
+                      {photo.viewCount.toLocaleString("en-US")}
+                    </p>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
 
       <section className="admin-card space-y-4 px-5 py-5 sm:px-6 sm:py-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
