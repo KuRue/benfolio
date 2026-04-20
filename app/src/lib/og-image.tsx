@@ -26,20 +26,70 @@ async function readDerivativeAsDataUrl(key: string): Promise<string | null> {
   }
 }
 
+// Rank by how well the derivative matches our ~600px tile render size.
+// GRID (960px) is the sweet spot; THUMBNAIL (320px) is a touch soft but
+// ships fast; VIEWER (1800px) is a last resort because it can push the
+// whole OG route past Cloudflare's edge timeout when we embed four of
+// them as base64 into satori.
+const KIND_PRIORITY: Record<string, number> = {
+  GRID: 0,
+  THUMBNAIL: 1,
+  VIEWER: 2,
+};
+
 async function collectTileSources(): Promise<string[]> {
   const events = await prisma.event.findMany({
     where: {
       visibility: "PUBLIC",
-      coverDisplayKey: { not: null },
+      coverOriginalKey: { not: null },
     },
     orderBy: [{ eventDate: "desc" }, { createdAt: "desc" }],
     take: TILE_CELLS,
-    select: { coverDisplayKey: true },
+    select: { coverOriginalKey: true, coverDisplayKey: true },
   });
 
-  const keys = events
-    .map((event) => event.coverDisplayKey)
+  const originalKeys = events
+    .map((event) => event.coverOriginalKey)
     .filter((key): key is string => Boolean(key));
+
+  // Pull smaller derivatives (GRID/THUMBNAIL) for the cover photos so the
+  // OG render stays fast.
+  const coverPhotos = originalKeys.length
+    ? await prisma.photo.findMany({
+        where: { originalKey: { in: originalKeys } },
+        select: {
+          originalKey: true,
+          derivatives: {
+            select: { kind: true, storageKey: true },
+          },
+        },
+      })
+    : [];
+
+  const byOriginal = new Map<string, string>();
+  for (const photo of coverPhotos) {
+    const best = [...photo.derivatives].sort(
+      (a, b) =>
+        (KIND_PRIORITY[a.kind] ?? 99) - (KIND_PRIORITY[b.kind] ?? 99),
+    )[0];
+    if (best?.storageKey) {
+      byOriginal.set(photo.originalKey, best.storageKey);
+    }
+  }
+
+  // Preserve event ordering; fall back to the event's coverDisplayKey
+  // (VIEWER) if the photo row has no derivatives for some reason.
+  const keys: string[] = [];
+  for (const event of events) {
+    const original = event.coverOriginalKey;
+    if (!original) continue;
+    const smaller = byOriginal.get(original);
+    if (smaller) {
+      keys.push(smaller);
+    } else if (event.coverDisplayKey) {
+      keys.push(event.coverDisplayKey);
+    }
+  }
 
   // Fall back to the SiteProfile cover when there are no public events yet.
   if (!keys.length) {
