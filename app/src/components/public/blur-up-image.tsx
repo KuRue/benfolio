@@ -47,8 +47,10 @@ export function BlurUpImage({
   const positionStyle = objectPosition ? { objectPosition } : undefined;
 
   return (
+    // `isolate` pins any future z-index uses inside this wrapper to its own
+    // stacking context, so we never leak above a parent's overlays again.
     <div
-      className={`relative h-full w-full overflow-hidden ${className ?? ""}`}
+      className={`relative isolate h-full w-full overflow-hidden ${className ?? ""}`}
       style={{ backgroundColor: dominantColor ?? undefined }}
     >
       {blurDataUrl ? (
@@ -62,13 +64,16 @@ export function BlurUpImage({
           style={positionStyle}
         />
       ) : null}
+      {/* Main image is absolute (not relative+z-10) so DOM order alone
+          stacks it above the blur placeholder — no z-index leaking out
+          of this component into a parent with its own overlays. */}
       <img
         src={src}
         alt={alt}
         ref={handleRef}
         loading={loading}
         onLoad={() => setLoaded(true)}
-        className={`relative z-10 h-full w-full object-cover transition-opacity duration-500 ${
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
           loaded ? "opacity-100" : "opacity-0"
         } ${imgClassName ?? ""}`}
         style={positionStyle}
