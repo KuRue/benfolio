@@ -1,6 +1,6 @@
-/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 
+import { BlurUpImage } from "@/components/public/blur-up-image";
 import { formatDateRange } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
 
@@ -16,6 +16,8 @@ type EventCardProps = {
     coverDisplayKey: string | null;
     coverFocalX: number | null;
     coverFocalY: number | null;
+    coverBlurDataUrl?: string | null;
+    coverDominantColor?: string | null;
     _count: {
       photos: number;
     };
@@ -33,11 +35,13 @@ export function EventCard({ event }: EventCardProps) {
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(197,146,92,0.24),_transparent_32%),linear-gradient(145deg,_#111,_#050505)]">
         {coverUrl ? (
-          <img
+          <BlurUpImage
             src={coverUrl}
             alt=""
-            className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03] group-hover:saturate-[1.03]"
-            style={{ objectPosition: coverPosition }}
+            blurDataUrl={event.coverBlurDataUrl}
+            dominantColor={event.coverDominantColor}
+            objectPosition={coverPosition}
+            imgClassName="transition duration-700 group-hover:scale-[1.03] group-hover:saturate-[1.03]"
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/14 to-transparent" />

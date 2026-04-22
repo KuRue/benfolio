@@ -45,14 +45,68 @@ function pickDerivative(
   return filtered[0] ?? fallback[0] ?? null;
 }
 
+type CoverBlurSource = {
+  blurDataUrl: string | null;
+  dominantColor: string | null;
+};
+
+/**
+ * Given a set of `originalKey` values used as event / site covers, fetch the
+ * matching Photo rows and return a lookup keyed by originalKey. We only need
+ * the blur + tint here — everything else comes from the event itself.
+ */
+async function fetchCoverBlurs(
+  originalKeys: Array<string | null | undefined>,
+): Promise<Map<string, CoverBlurSource>> {
+  const keys = Array.from(
+    new Set(originalKeys.filter((k): k is string => Boolean(k))),
+  );
+  if (keys.length === 0) return new Map();
+
+  const photos = await prisma.photo.findMany({
+    where: { originalKey: { in: keys } },
+    select: {
+      originalKey: true,
+      blurDataUrl: true,
+      dominantColor: true,
+    },
+  });
+
+  const map = new Map<string, CoverBlurSource>();
+  for (const photo of photos) {
+    if (!map.has(photo.originalKey)) {
+      map.set(photo.originalKey, {
+        blurDataUrl: photo.blurDataUrl,
+        dominantColor: photo.dominantColor,
+      });
+    }
+  }
+  return map;
+}
+
 export async function getSiteProfile() {
   const siteProfile = await prisma.siteProfile.findUnique({
     where: { id: "default" },
   });
 
-  return {
+  const merged = {
     ...defaultSiteProfile,
     ...siteProfile,
+  };
+
+  const coverBlur = merged.coverOriginalKey
+    ? (
+        await prisma.photo.findFirst({
+          where: { originalKey: merged.coverOriginalKey },
+          select: { blurDataUrl: true, dominantColor: true },
+        })
+      ) ?? null
+    : null;
+
+  return {
+    ...merged,
+    coverBlurDataUrl: coverBlur?.blurDataUrl ?? null,
+    coverDominantColor: coverBlur?.dominantColor ?? null,
   };
 }
 
@@ -75,7 +129,22 @@ export async function getHomepageData() {
     }),
   ]);
 
-  return { siteProfile, runtimeSettings, events };
+  const coverBlurs = await fetchCoverBlurs(
+    events.map((event) => event.coverOriginalKey),
+  );
+
+  const enrichedEvents = events.map((event) => {
+    const blur = event.coverOriginalKey
+      ? coverBlurs.get(event.coverOriginalKey)
+      : undefined;
+    return {
+      ...event,
+      coverBlurDataUrl: blur?.blurDataUrl ?? null,
+      coverDominantColor: blur?.dominantColor ?? null,
+    };
+  });
+
+  return { siteProfile, runtimeSettings, events: enrichedEvents };
 }
 
 export async function getPublicEventBySlug(slug: string) {
@@ -104,8 +173,31 @@ export async function getPublicEventBySlug(slug: string) {
     return null;
   }
 
+  // Reuse the cover photo's blur/tint if it lives in this event's own
+  // photo list — avoids a second query. Otherwise fall back to a lookup.
+  const coverFromEvent = event.coverOriginalKey
+    ? event.photos.find(
+        (photo) => photo.originalKey === event.coverOriginalKey,
+      )
+    : null;
+  const coverBlur = coverFromEvent
+    ? {
+        blurDataUrl: coverFromEvent.blurDataUrl,
+        dominantColor: coverFromEvent.dominantColor,
+      }
+    : event.coverOriginalKey
+    ? (
+        await prisma.photo.findFirst({
+          where: { originalKey: event.coverOriginalKey },
+          select: { blurDataUrl: true, dominantColor: true },
+        })
+      ) ?? null
+    : null;
+
   return {
     ...event,
+    coverBlurDataUrl: coverBlur?.blurDataUrl ?? null,
+    coverDominantColor: coverBlur?.dominantColor ?? null,
     photos: event.photos.map((photo) => {
       const gridDerivative = pickDerivative(photo.derivatives, "GRID");
       const viewerDerivative = pickDerivative(photo.derivatives, "VIEWER");

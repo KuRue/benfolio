@@ -1,8 +1,8 @@
-/* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 
 import { notFound } from "next/navigation";
 
+import { BlurUpImage } from "@/components/public/blur-up-image";
 import { PhotoGrid } from "@/components/public/photo-grid";
 import { PublicSiteMark } from "@/components/public/public-site-mark";
 import { PublicPhotoSearchLauncher } from "@/components/public/public-photo-search-launcher";
@@ -87,12 +87,15 @@ export default async function EventPage({ params }: EventPageProps) {
         <section className="overflow-hidden rounded-[1.5rem] border border-white/8 bg-[#090909] shadow-[0_28px_96px_rgba(0,0,0,0.34)]">
           <div className="relative min-h-[10rem] overflow-hidden sm:min-h-[11.5rem] lg:min-h-[13rem]">
             {coverUrl ? (
-              <img
-                src={coverUrl}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-                style={{ objectPosition: coverPosition }}
-              />
+              <div className="absolute inset-0">
+                <BlurUpImage
+                  src={coverUrl}
+                  alt=""
+                  blurDataUrl={event.coverBlurDataUrl}
+                  dominantColor={event.coverDominantColor}
+                  objectPosition={coverPosition}
+                />
+              </div>
             ) : (
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(197,146,92,0.26),_transparent_32%),linear-gradient(145deg,_#141414,_#070707)]" />
             )}

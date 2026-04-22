@@ -97,25 +97,33 @@ export default async function AdminAnalyticsPage() {
           </p>
         ) : (
           <div className="space-y-2">
-            <div className="flex items-end gap-[3px] h-40 rounded-[1rem] border border-white/8 bg-white/[0.02] px-3 py-3">
-              {visitorsSeries.map((point) => {
-                const heightPct =
-                  peakDailyVisitors === 0
-                    ? 0
-                    : (point.visitors / peakDailyVisitors) * 100;
-                return (
-                  <div
-                    key={point.day.toISOString()}
-                    className="group relative flex-1 min-w-[6px] flex items-end"
-                    title={`${formatDay(point.day)}: ${formatNumber(point.visitors)} visitor${point.visitors === 1 ? "" : "s"}`}
-                  >
+            {/* Outer box has padding; the inner positioned container gives
+                the flex row a determinate height so each bar's `height: X%`
+                resolves against the actual chart area. */}
+            <div className="relative h-40 rounded-[1rem] border border-white/8 bg-white/[0.02]">
+              <div className="absolute inset-x-3 bottom-3 top-3 flex items-end gap-[3px]">
+                {visitorsSeries.map((point) => {
+                  const heightPct =
+                    peakDailyVisitors === 0
+                      ? 0
+                      : (point.visitors / peakDailyVisitors) * 100;
+                  const displayHeight =
+                    point.visitors > 0 ? Math.max(heightPct, 3) : 0;
+                  return (
                     <div
-                      className="w-full rounded-t-[3px] bg-white/70 transition group-hover:bg-white"
-                      style={{ height: `${Math.max(heightPct, point.visitors > 0 ? 4 : 0)}%` }}
-                    />
-                  </div>
-                );
-              })}
+                      key={point.day.toISOString()}
+                      className="group relative flex-1 min-w-0"
+                      style={{ height: "100%" }}
+                      title={`${formatDay(point.day)}: ${formatNumber(point.visitors)} visitor${point.visitors === 1 ? "" : "s"}`}
+                    >
+                      <div
+                        className="absolute inset-x-0 bottom-0 rounded-t-[3px] bg-white/70 transition group-hover:bg-white"
+                        style={{ height: `${displayHeight}%` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className="flex items-center justify-between text-[0.68rem] uppercase tracking-[0.22em] text-white/40">
               <span>{formatDay(visitorsSeries[0]!.day)}</span>

@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 
+import { BlurUpImage } from "@/components/public/blur-up-image";
 import { PublicSiteMark } from "@/components/public/public-site-mark";
 import { PublicPhotoSearchLauncher } from "@/components/public/public-photo-search-launcher";
 import { getMonogram } from "@/lib/strings";
@@ -19,6 +20,8 @@ type SiteHeaderProps = {
     coverDisplayKey: string | null;
     coverFocalX?: number | null;
     coverFocalY?: number | null;
+    coverBlurDataUrl?: string | null;
+    coverDominantColor?: string | null;
   };
   showSearch?: boolean;
   showLogoMark?: boolean;
@@ -64,12 +67,15 @@ export function SiteHeader({ profile, showSearch = true, showLogoMark = true }: 
   return (
     <section className="solid-panel relative min-h-[12rem] overflow-hidden sm:min-h-[13rem] lg:min-h-[14rem]">
       {coverUrl ? (
-        <img
-          src={coverUrl}
-          alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.96]"
-          style={{ objectPosition: coverPosition }}
-        />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.96]">
+          <BlurUpImage
+            src={coverUrl}
+            alt=""
+            blurDataUrl={profile.coverBlurDataUrl}
+            dominantColor={profile.coverDominantColor}
+            objectPosition={coverPosition}
+          />
+        </div>
       ) : (
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(197,146,92,0.26),_transparent_36%),linear-gradient(135deg,_#151515_0%,_#0b0b0b_48%,_#1a1a1a_100%)]" />
       )}
