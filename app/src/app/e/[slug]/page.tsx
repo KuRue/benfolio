@@ -7,6 +7,7 @@ import { PhotoGrid } from "@/components/public/photo-grid";
 import { PublicSiteMark } from "@/components/public/public-site-mark";
 import { PublicPhotoSearchLauncher } from "@/components/public/public-photo-search-launcher";
 import { getResolvedRuntimeSettings } from "@/lib/app-settings";
+import { gravityFromFocal } from "@/lib/cf-images";
 import { getPublicEventBySlug, getSiteProfile } from "@/lib/gallery";
 import { absoluteUrl, formatDateRange } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
@@ -94,6 +95,14 @@ export default async function EventPage({ params }: EventPageProps) {
                   blurDataUrl={event.coverBlurDataUrl}
                   dominantColor={event.coverDominantColor}
                   objectPosition={coverPosition}
+                  cfStorageKey={event.coverDisplayKey}
+                  cfWidths={[960, 1440, 1920]}
+                  cfSizes="100vw"
+                  cfOptions={{
+                    fit: "cover",
+                    quality: 82,
+                    gravity: gravityFromFocal(event.coverFocalX, event.coverFocalY),
+                  }}
                 />
               </div>
             ) : (

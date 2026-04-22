@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BlurUpImage } from "@/components/public/blur-up-image";
 import { PublicSiteMark } from "@/components/public/public-site-mark";
 import { PublicPhotoSearchLauncher } from "@/components/public/public-photo-search-launcher";
+import { gravityFromFocal } from "@/lib/cf-images";
 import { getMonogram } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
 
@@ -74,6 +75,14 @@ export function SiteHeader({ profile, showSearch = true, showLogoMark = true }: 
             blurDataUrl={profile.coverBlurDataUrl}
             dominantColor={profile.coverDominantColor}
             objectPosition={coverPosition}
+            cfStorageKey={profile.coverDisplayKey}
+            cfWidths={[960, 1440, 1920]}
+            cfSizes="100vw"
+            cfOptions={{
+              fit: "cover",
+              quality: 82,
+              gravity: gravityFromFocal(profile.coverFocalX, profile.coverFocalY),
+            }}
           />
         </div>
       ) : (
