@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useEffectEvent,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -27,7 +28,19 @@ type ViewerTagGroup = {
   }>;
 };
 
+type ViewerFrame = {
+  photoId: string;
+  imageUrl: string | null;
+  imageWidth: number;
+  imageHeight: number;
+  placeholderUrl: string | null;
+  blurDataUrl: string | null;
+  dominantColor: string | null;
+  alt: string;
+};
+
 type PhotoViewerClientProps = {
+  photoId: string;
   imageUrl: string | null;
   imageWidth: number;
   imageHeight: number;
@@ -63,6 +76,60 @@ function isTypingTarget(target: EventTarget | null) {
 
 function viewerActionClass(active = false) {
   return `viewer-control ${active ? "border-white/18 bg-white text-black shadow-[0_16px_34px_rgba(255,255,255,0.14)]" : ""}`;
+}
+
+function ViewerFrameImage({
+  frame,
+  loaded,
+  onImageRef,
+  onLoad,
+}: {
+  frame: ViewerFrame;
+  loaded: boolean;
+  onImageRef?: (node: HTMLImageElement | null) => void;
+  onLoad?: () => void;
+}) {
+  return (
+    <div
+      className="relative flex h-full w-full items-center justify-center"
+      style={{ backgroundColor: frame.dominantColor ?? "#0c0c0c" }}
+    >
+      {frame.blurDataUrl ? (
+        <img
+          src={frame.blurDataUrl}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 h-full w-full scale-[1.08] object-cover blur-[18px]"
+        />
+      ) : null}
+      {frame.placeholderUrl ? (
+        <img
+          src={frame.placeholderUrl}
+          alt=""
+          aria-hidden
+          decoding="async"
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
+            loaded ? "opacity-0" : "opacity-100"
+          }`}
+        />
+      ) : null}
+      {frame.imageUrl ? (
+        <img
+          ref={onImageRef}
+          src={frame.imageUrl}
+          width={frame.imageWidth}
+          height={frame.imageHeight}
+          alt={frame.alt}
+          decoding="async"
+          fetchPriority="high"
+          onLoad={onLoad}
+          className={`relative z-10 max-h-[calc(100dvh-0.65rem)] w-auto max-w-[calc(100vw-0.65rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-0.9rem)] sm:max-w-[calc(100vw-0.9rem)] lg:max-h-[calc(100dvh-1.8rem)] [@media(min-width:1024px)_and_(min-height:760px)]:max-h-[calc(100dvh-8rem)] ${
+            loaded ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ) : null}
+    </div>
+  );
 }
 
 function DetailsPanel({
@@ -142,6 +209,7 @@ function DetailsPanel({
 }
 
 export function PhotoViewerClient({
+  photoId,
   imageUrl,
   imageWidth,
   imageHeight,
@@ -169,9 +237,39 @@ export function PhotoViewerClient({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [sheetDragY, setSheetDragY] = useState(0);
   const [fullLoaded, setFullLoaded] = useState(false);
+  const [previousFrame, setPreviousFrame] = useState<ViewerFrame | null>(null);
+  const [slideActive, setSlideActive] = useState(false);
+  const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
   const touchStartX = useRef<number | null>(null);
   const sheetTouchStartY = useRef<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
+  const currentFrameRef = useRef<ViewerFrame | null>(null);
+  const lastPhotoIdRef = useRef(photoId);
+  const pendingDirectionRef = useRef<1 | -1>(1);
+  const slideTimeoutRef = useRef<number | null>(null);
+  const slideRafRef = useRef<number | null>(null);
+  const currentFrame = useMemo<ViewerFrame>(
+    () => ({
+      photoId,
+      imageUrl,
+      imageWidth,
+      imageHeight,
+      placeholderUrl,
+      blurDataUrl,
+      dominantColor,
+      alt,
+    }),
+    [
+      alt,
+      blurDataUrl,
+      dominantColor,
+      imageHeight,
+      imageUrl,
+      imageWidth,
+      photoId,
+      placeholderUrl,
+    ],
+  );
   // Ref callback instead of useRef because cached images can finish decoding
   // before React attaches its delegated load listener. Checking `.complete`
   // at commit time is the only reliable way to catch that case.
@@ -179,6 +277,55 @@ export function PhotoViewerClient({
     if (node?.complete && node.naturalWidth > 0) {
       setFullLoaded(true);
     }
+  }, []);
+
+  useEffect(() => {
+    if (lastPhotoIdRef.current !== photoId) {
+      const outgoingFrame = currentFrameRef.current;
+
+      if (outgoingFrame?.imageUrl) {
+        setPreviousFrame(outgoingFrame);
+        setSlideDirection(pendingDirectionRef.current);
+        setSlideActive(false);
+
+        if (slideRafRef.current) {
+          window.cancelAnimationFrame(slideRafRef.current);
+        }
+        slideRafRef.current = window.requestAnimationFrame(() => {
+          slideRafRef.current = window.requestAnimationFrame(() => {
+            setSlideActive(true);
+          });
+        });
+
+        if (slideTimeoutRef.current) {
+          window.clearTimeout(slideTimeoutRef.current);
+        }
+        slideTimeoutRef.current = window.setTimeout(() => {
+          setPreviousFrame(null);
+          setSlideActive(false);
+        }, 520);
+      }
+
+      setFullLoaded(false);
+      lastPhotoIdRef.current = photoId;
+    }
+
+    currentFrameRef.current = currentFrame;
+  }, [
+    currentFrame,
+    photoId,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (slideTimeoutRef.current) {
+        window.clearTimeout(slideTimeoutRef.current);
+      }
+
+      if (slideRafRef.current) {
+        window.cancelAnimationFrame(slideRafRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -243,6 +390,7 @@ export function PhotoViewerClient({
     }
 
     revealControls();
+    pendingDirectionRef.current = href === previousHref ? -1 : 1;
 
     startTransition(() => {
       if (isModal) {
@@ -510,42 +658,37 @@ export function PhotoViewerClient({
         >
           {imageUrl ? (
             <div className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] lg:p-1.5">
-              <div
-                className="relative overflow-hidden rounded-[1.05rem] shadow-[0_24px_90px_rgba(0,0,0,0.36)]"
-                style={{ backgroundColor: dominantColor ?? "#0c0c0c" }}
-              >
-                {blurDataUrl ? (
-                  <img
-                    src={blurDataUrl}
-                    alt=""
+              <div className="relative overflow-hidden rounded-[1.05rem] shadow-[0_24px_90px_rgba(0,0,0,0.36)]">
+                {previousFrame ? (
+                  <div
+                    className="absolute inset-0 z-20 flex items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:hidden"
+                    style={{
+                      transform: slideActive
+                        ? `translateX(${-slideDirection * 112}%)`
+                        : "translateX(0)",
+                    }}
                     aria-hidden
-                    className="absolute inset-0 h-full w-full scale-[1.08] object-cover blur-[18px]"
-                  />
+                  >
+                    <ViewerFrameImage frame={previousFrame} loaded />
+                  </div>
                 ) : null}
-                {placeholderUrl ? (
-                  <img
-                    src={placeholderUrl}
-                    alt=""
-                    aria-hidden
-                    decoding="async"
-                    className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
-                      fullLoaded ? "opacity-0" : "opacity-100"
-                    }`}
+                <div
+                  className="relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transform-none motion-reduce:transition-none"
+                  style={{
+                    transform: previousFrame
+                      ? slideActive
+                        ? "translateX(0)"
+                        : `translateX(${slideDirection * 112}%)`
+                      : "translateX(0)",
+                  }}
+                >
+                  <ViewerFrameImage
+                    frame={currentFrame}
+                    loaded={fullLoaded}
+                    onImageRef={handleFullImageRef}
+                    onLoad={() => setFullLoaded(true)}
                   />
-                ) : null}
-                <img
-                  ref={handleFullImageRef}
-                  src={imageUrl}
-                  width={imageWidth}
-                  height={imageHeight}
-                  alt={alt}
-                  decoding="async"
-                  fetchPriority="high"
-                  onLoad={() => setFullLoaded(true)}
-                  className={`relative z-10 max-h-[calc(100dvh-0.65rem)] w-auto max-w-[calc(100vw-0.65rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-0.9rem)] sm:max-w-[calc(100vw-0.9rem)] lg:max-h-[calc(100dvh-1.8rem)] [@media(min-width:1024px)_and_(min-height:760px)]:max-h-[calc(100dvh-8rem)] ${
-                    fullLoaded ? "opacity-100" : "opacity-0"
-                  }`}
-                />
+                </div>
               </div>
             </div>
           ) : (

@@ -120,7 +120,7 @@ export function PhotoViewerShell({
 
   return (
     <PhotoViewerClient
-      key={viewer.id}
+      photoId={viewer.id}
       imageUrl={viewer.imageUrl}
       imageWidth={viewer.imageWidth}
       imageHeight={viewer.imageHeight}
