@@ -51,6 +51,7 @@ export default async function AdminSettingsPage() {
           profile={siteProfile}
           showSearch={false}
           showLogoMark={runtimeSettings.logoMarkEnabled}
+          cfEnabled={runtimeSettings.cfImagesEnabled}
         />
       </section>
 
@@ -88,6 +89,7 @@ export default async function AdminSettingsPage() {
           defaultEventVisibility: runtimeSettings.defaultEventVisibility,
           directUploadEnabled: runtimeSettings.directUploadEnabled,
           logoMarkEnabled: runtimeSettings.logoMarkEnabled,
+          cfImagesEnabled: runtimeSettings.cfImagesEnabled,
         }}
         appUrl={runtimeSettings.appUrl}
         webhookSignatureEnabled={Boolean(env.STORAGE_WEBHOOK_SECRET)}

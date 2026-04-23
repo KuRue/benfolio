@@ -26,6 +26,7 @@ type AppSettingsFormProps = {
     defaultEventVisibility: "DRAFT" | "HIDDEN" | "PUBLIC";
     directUploadEnabled: boolean;
     logoMarkEnabled: boolean;
+    cfImagesEnabled: boolean;
   };
   appUrl: string;
   webhookSignatureEnabled: boolean;
@@ -326,6 +327,12 @@ export function AppSettingsForm({
             label="Logo mark"
             description="Show the public home mark."
             defaultChecked={initialValues.logoMarkEnabled}
+          />
+          <CheckboxField
+            name="cfImagesEnabled"
+            label="Cloudflare image transforms"
+            description="Serve covers through /cdn-cgi/image/. Requires the app to be proxied through Cloudflare (orange-cloud DNS or cloudflared tunnel) with Transformations enabled on the zone."
+            defaultChecked={initialValues.cfImagesEnabled}
           />
         </div>
 

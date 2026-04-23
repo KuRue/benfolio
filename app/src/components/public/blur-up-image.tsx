@@ -1,13 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useMemo, useState } from "react";
-
-import {
-  buildTransformedImageUrl,
-  buildTransformedSrcSet,
-  type TransformOptions,
-} from "@/lib/cf-images";
+import { useCallback, useState } from "react";
 
 type BlurUpImageProps = {
   src: string;
@@ -24,15 +18,13 @@ type BlurUpImageProps = {
   className?: string;
   loading?: "eager" | "lazy";
   /**
-   * When set with a non-empty `cfWidths`, generates a responsive srcset
-   * via Cloudflare Image Transformations. No-op unless
-   * `NEXT_PUBLIC_CF_IMAGES_ENABLED=true` — the component silently falls
-   * back to the plain `src` so existing deployments keep working.
+   * Optional responsive srcset. Callers that want Cloudflare image
+   * transformations build this server-side via `buildTransformedSrcSet`
+   * so this component stays agnostic of the transform pipeline.
    */
-  cfStorageKey?: string | null;
-  cfWidths?: number[];
-  cfSizes?: string;
-  cfOptions?: Omit<TransformOptions, "width">;
+  srcSet?: string;
+  /** Required whenever `srcSet` is set so browsers pick the right entry. */
+  sizes?: string;
 };
 
 /**
@@ -49,10 +41,8 @@ export function BlurUpImage({
   imgClassName,
   className,
   loading = "eager",
-  cfStorageKey,
-  cfWidths,
-  cfSizes,
-  cfOptions,
+  srcSet,
+  sizes,
 }: BlurUpImageProps) {
   const [loaded, setLoaded] = useState(false);
 
@@ -65,25 +55,6 @@ export function BlurUpImage({
   }, []);
 
   const positionStyle = objectPosition ? { objectPosition } : undefined;
-
-  // Derive a Cloudflare-transformed src + srcset when the caller opted
-  // in. When CF transforms are disabled at build time, both helpers
-  // return null/undefined and we keep the plain `src`.
-  const { resolvedSrc, resolvedSrcSet } = useMemo(() => {
-    if (!cfStorageKey || !cfWidths || cfWidths.length === 0) {
-      return { resolvedSrc: src, resolvedSrcSet: undefined as string | undefined };
-    }
-    const largest = Math.max(...cfWidths);
-    const transformed = buildTransformedImageUrl(cfStorageKey, {
-      ...cfOptions,
-      width: largest,
-    });
-    const srcSet = buildTransformedSrcSet(cfStorageKey, cfWidths, cfOptions);
-    return {
-      resolvedSrc: transformed ?? src,
-      resolvedSrcSet: srcSet,
-    };
-  }, [cfStorageKey, cfWidths, cfOptions, src]);
 
   return (
     // `isolate` pins any future z-index uses inside this wrapper to its own
@@ -107,9 +78,9 @@ export function BlurUpImage({
           stacks it above the blur placeholder — no z-index leaking out
           of this component into a parent with its own overlays. */}
       <img
-        src={resolvedSrc}
-        srcSet={resolvedSrcSet}
-        sizes={resolvedSrcSet ? cfSizes ?? "100vw" : undefined}
+        src={src}
+        srcSet={srcSet}
+        sizes={srcSet ? sizes ?? "100vw" : undefined}
         alt={alt}
         ref={handleRef}
         loading={loading}

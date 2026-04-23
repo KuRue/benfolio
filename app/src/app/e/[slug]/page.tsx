@@ -7,10 +7,18 @@ import { PhotoGrid } from "@/components/public/photo-grid";
 import { PublicSiteMark } from "@/components/public/public-site-mark";
 import { PublicPhotoSearchLauncher } from "@/components/public/public-photo-search-launcher";
 import { getResolvedRuntimeSettings } from "@/lib/app-settings";
-import { gravityFromFocal } from "@/lib/cf-images";
+import {
+  buildTransformedImageUrl,
+  buildTransformedSrcSet,
+  gravityFromFocal,
+} from "@/lib/cf-images";
 import { getPublicEventBySlug, getSiteProfile } from "@/lib/gallery";
 import { absoluteUrl, formatDateRange } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
+
+// Matches SiteHeader — same edge-to-edge hero ratio, same cache pool.
+const HERO_WIDTHS = [960, 1440, 1920];
+const HERO_SIZES = "100vw";
 
 export const dynamic = "force-dynamic";
 
@@ -79,8 +87,29 @@ export default async function EventPage({ params }: EventPageProps) {
     notFound();
   }
 
-  const coverUrl = buildDisplayUrl(event.coverDisplayKey);
+  const plainCoverUrl = buildDisplayUrl(event.coverDisplayKey);
   const coverPosition = `${event.coverFocalX ?? 50}% ${event.coverFocalY ?? 50}%`;
+  const cfEnabled = runtimeSettings.cfImagesEnabled;
+  const coverTransformOptions = {
+    fit: "cover" as const,
+    quality: 82,
+    gravity: gravityFromFocal(event.coverFocalX, event.coverFocalY),
+  };
+  const transformedCover = buildTransformedImageUrl(
+    event.coverDisplayKey,
+    cfEnabled,
+    {
+      ...coverTransformOptions,
+      width: Math.max(...HERO_WIDTHS),
+    },
+  );
+  const coverSrcSet = buildTransformedSrcSet(
+    event.coverDisplayKey,
+    cfEnabled,
+    HERO_WIDTHS,
+    coverTransformOptions,
+  );
+  const coverUrl = transformedCover ?? plainCoverUrl;
 
   return (
     <main className="pb-16 pt-2 sm:pt-3 lg:pt-4">
@@ -91,18 +120,12 @@ export default async function EventPage({ params }: EventPageProps) {
               <div className="absolute inset-0">
                 <BlurUpImage
                   src={coverUrl}
+                  srcSet={coverSrcSet}
+                  sizes={HERO_SIZES}
                   alt=""
                   blurDataUrl={event.coverBlurDataUrl}
                   dominantColor={event.coverDominantColor}
                   objectPosition={coverPosition}
-                  cfStorageKey={event.coverDisplayKey}
-                  cfWidths={[960, 1440, 1920]}
-                  cfSizes="100vw"
-                  cfOptions={{
-                    fit: "cover",
-                    quality: 82,
-                    gravity: gravityFromFocal(event.coverFocalX, event.coverFocalY),
-                  }}
                 />
               </div>
             ) : (

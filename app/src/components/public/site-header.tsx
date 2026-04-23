@@ -4,7 +4,11 @@ import Link from "next/link";
 import { BlurUpImage } from "@/components/public/blur-up-image";
 import { PublicSiteMark } from "@/components/public/public-site-mark";
 import { PublicPhotoSearchLauncher } from "@/components/public/public-photo-search-launcher";
-import { gravityFromFocal } from "@/lib/cf-images";
+import {
+  buildTransformedImageUrl,
+  buildTransformedSrcSet,
+  gravityFromFocal,
+} from "@/lib/cf-images";
 import { getMonogram } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
 
@@ -26,7 +30,15 @@ type SiteHeaderProps = {
   };
   showSearch?: boolean;
   showLogoMark?: boolean;
+  /** Resolved from `cfImagesEnabled` runtime setting by the caller. */
+  cfEnabled?: boolean;
 };
+
+// 3 widths span mobile → ultrawide. The header cover is edge-to-edge
+// so it's consistently the largest cover on the page — keep AVIF/WebP
+// on via the default `format=auto`.
+const COVER_WIDTHS = [960, 1440, 1920];
+const COVER_SIZES = "100vw";
 
 function getLinkLabel(linkHref: string, instagramUrl: string | null) {
   if (instagramUrl && linkHref === instagramUrl) {
@@ -58,9 +70,34 @@ function buildProfileLinks(
   return links;
 }
 
-export function SiteHeader({ profile, showSearch = true, showLogoMark = true }: SiteHeaderProps) {
+export function SiteHeader({
+  profile,
+  showSearch = true,
+  showLogoMark = true,
+  cfEnabled = false,
+}: SiteHeaderProps) {
   const avatarUrl = buildDisplayUrl(profile.avatarDisplayKey);
-  const coverUrl = buildDisplayUrl(profile.coverDisplayKey);
+  const plainCoverUrl = buildDisplayUrl(profile.coverDisplayKey);
+  const transformOptions = {
+    fit: "cover" as const,
+    quality: 82,
+    gravity: gravityFromFocal(profile.coverFocalX, profile.coverFocalY),
+  };
+  const transformedCover = buildTransformedImageUrl(
+    profile.coverDisplayKey,
+    cfEnabled,
+    {
+      ...transformOptions,
+      width: Math.max(...COVER_WIDTHS),
+    },
+  );
+  const coverSrcSet = buildTransformedSrcSet(
+    profile.coverDisplayKey,
+    cfEnabled,
+    COVER_WIDTHS,
+    transformOptions,
+  );
+  const coverUrl = transformedCover ?? plainCoverUrl;
   const publicBio = profile.headline.trim() || profile.bio.trim();
   const profileLinks = buildProfileLinks(profile.websiteUrl, profile.instagramUrl);
   const coverPosition = `${profile.coverFocalX ?? 50}% ${profile.coverFocalY ?? 50}%`;
@@ -71,18 +108,12 @@ export function SiteHeader({ profile, showSearch = true, showLogoMark = true }: 
         <div className="pointer-events-none absolute inset-0 opacity-[0.96]">
           <BlurUpImage
             src={coverUrl}
+            srcSet={coverSrcSet}
+            sizes={COVER_SIZES}
             alt=""
             blurDataUrl={profile.coverBlurDataUrl}
             dominantColor={profile.coverDominantColor}
             objectPosition={coverPosition}
-            cfStorageKey={profile.coverDisplayKey}
-            cfWidths={[960, 1440, 1920]}
-            cfSizes="100vw"
-            cfOptions={{
-              fit: "cover",
-              quality: 82,
-              gravity: gravityFromFocal(profile.coverFocalX, profile.coverFocalY),
-            }}
           />
         </div>
       ) : (

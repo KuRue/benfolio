@@ -1,7 +1,11 @@
 import Link from "next/link";
 
 import { BlurUpImage } from "@/components/public/blur-up-image";
-import { gravityFromFocal } from "@/lib/cf-images";
+import {
+  buildTransformedImageUrl,
+  buildTransformedSrcSet,
+  gravityFromFocal,
+} from "@/lib/cf-images";
 import { formatDateRange } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
 
@@ -23,11 +27,39 @@ type EventCardProps = {
       photos: number;
     };
   };
+  /** Resolved from `cfImagesEnabled` runtime setting by the caller. */
+  cfEnabled: boolean;
 };
 
-export function EventCard({ event }: EventCardProps) {
-  const coverUrl = buildDisplayUrl(event.coverDisplayKey);
+// Cloudflare transformations: 3 widths cover mobile → xl grid
+// columns (~22rem max). ~3 transforms per unique event cover per
+// month, cached after that.
+const GRID_WIDTHS = [480, 720, 960];
+const GRID_SIZES = "(min-width: 1280px) 22rem, (min-width: 640px) 40vw, 100vw";
+
+export function EventCard({ event, cfEnabled }: EventCardProps) {
+  const plainCoverUrl = buildDisplayUrl(event.coverDisplayKey);
   const coverPosition = `${event.coverFocalX ?? 50}% ${event.coverFocalY ?? 50}%`;
+  const transformOptions = {
+    fit: "cover" as const,
+    quality: 82,
+    gravity: gravityFromFocal(event.coverFocalX, event.coverFocalY),
+  };
+  const transformedCover = buildTransformedImageUrl(
+    event.coverDisplayKey,
+    cfEnabled,
+    {
+      ...transformOptions,
+      width: Math.max(...GRID_WIDTHS),
+    },
+  );
+  const coverSrcSet = buildTransformedSrcSet(
+    event.coverDisplayKey,
+    cfEnabled,
+    GRID_WIDTHS,
+    transformOptions,
+  );
+  const coverUrl = transformedCover ?? plainCoverUrl;
 
   return (
     <Link
@@ -38,22 +70,13 @@ export function EventCard({ event }: EventCardProps) {
         {coverUrl ? (
           <BlurUpImage
             src={coverUrl}
+            srcSet={coverSrcSet}
+            sizes={GRID_SIZES}
             alt=""
             blurDataUrl={event.coverBlurDataUrl}
             dominantColor={event.coverDominantColor}
             objectPosition={coverPosition}
             imgClassName="transition duration-700 group-hover:scale-[1.03] group-hover:saturate-[1.03]"
-            // Cloudflare transformations: 3 widths cover mobile → xl grid
-            // columns (~22rem max). ~3 transforms per unique event cover
-            // per month, cached after that.
-            cfStorageKey={event.coverDisplayKey}
-            cfWidths={[480, 720, 960]}
-            cfSizes="(min-width: 1280px) 22rem, (min-width: 640px) 40vw, 100vw"
-            cfOptions={{
-              fit: "cover",
-              quality: 82,
-              gravity: gravityFromFocal(event.coverFocalX, event.coverFocalY),
-            }}
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/14 to-transparent" />

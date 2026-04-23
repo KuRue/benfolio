@@ -1,9 +1,9 @@
 /**
  * Cloudflare Image Transformations helper.
  *
- * When enabled via `NEXT_PUBLIC_CF_IMAGES_ENABLED=true`, these helpers
- * wrap the existing `/i/<key>` derivative URLs in `/cdn-cgi/image/...`
- * so Cloudflare can resize, reformat, and re-encode at the edge.
+ * When the `cfImagesEnabled` runtime setting is on, these helpers wrap
+ * the existing `/i/<key>` derivative URLs in `/cdn-cgi/image/...` so
+ * Cloudflare can resize, reformat, and re-encode at the edge.
  *
  * The underlying `/i/[...key]` route still serves the raw derivative
  * from R2 — Cloudflare fetches it as the transformation source, then
@@ -13,22 +13,20 @@
  * request is a cache hit and costs nothing.
  *
  * Prerequisites for this to work on the zone:
- *   1. APP_URL must be a hostname proxied through Cloudflare (orange
- *      cloud DNS, not DNS-only).
+ *   1. The app must be reachable through Cloudflare's edge — either an
+ *      orange-cloud proxied DNS record OR a cloudflared tunnel (the
+ *      tunnel terminates at Cloudflare and is always proxied).
  *   2. Dashboard → the zone → Images → Transformations → "Enable for
  *      Zone". The free plan includes 5000 unique transformations per
  *      month.
- *   3. `NEXT_PUBLIC_CF_IMAGES_ENABLED=true` in the app environment.
+ *   3. The `cfImagesEnabled` toggle in admin settings is on.
  *
- * If any of those are missing, the helpers transparently fall back to
- * the plain `/i/<key>` URL — same behaviour as before.
+ * If the toggle is off (or the caller omits `enabled`), the helpers
+ * transparently fall back to the plain `/i/<key>` URL — same behaviour
+ * as before.
  *
  * See https://developers.cloudflare.com/images/transform-images/
  */
-
-// Inlined at build time by Next for both client and server bundles.
-export const CF_IMAGES_ENABLED =
-  process.env.NEXT_PUBLIC_CF_IMAGES_ENABLED === "true";
 
 export type TransformFit = "cover" | "contain" | "scale-down" | "crop" | "pad";
 export type TransformFormat = "auto" | "avif" | "webp" | "jpeg" | "png";
@@ -84,14 +82,18 @@ function serializeOptions(opts: TransformOptions): string {
 /**
  * Build a single transformed image URL, or fall back to the plain
  * derivative URL when Cloudflare transformations aren't enabled.
+ *
+ * `enabled` is the resolved `cfImagesEnabled` runtime setting — callers
+ * read it via `getResolvedRuntimeSettings()` and thread it down.
  */
 export function buildTransformedImageUrl(
   storageKey: string | null | undefined,
+  enabled: boolean,
   opts: TransformOptions = {},
 ): string | null {
   if (!storageKey) return null;
   const path = `/i/${encodeKeyPath(storageKey)}`;
-  if (!CF_IMAGES_ENABLED) return path;
+  if (!enabled) return path;
   return `/cdn-cgi/image/${serializeOptions(opts)}${path}`;
 }
 
@@ -107,15 +109,19 @@ export function buildTransformedImageUrl(
  */
 export function buildTransformedSrcSet(
   storageKey: string | null | undefined,
+  enabled: boolean,
   widths: number[],
   baseOpts: Omit<TransformOptions, "width"> = {},
 ): string | undefined {
-  if (!storageKey || !CF_IMAGES_ENABLED || widths.length === 0) {
+  if (!storageKey || !enabled || widths.length === 0) {
     return undefined;
   }
   return widths
     .map((width) => {
-      const url = buildTransformedImageUrl(storageKey, { ...baseOpts, width });
+      const url = buildTransformedImageUrl(storageKey, enabled, {
+        ...baseOpts,
+        width,
+      });
       return `${url} ${width}w`;
     })
     .join(", ");

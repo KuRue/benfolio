@@ -18,6 +18,7 @@ export type RuntimeSettingsRecord = {
   defaultEventVisibility?: RuntimeEventVisibility | null;
   directUploadEnabled?: boolean | null;
   logoMarkEnabled?: boolean | null;
+  cfImagesEnabled?: boolean | null;
 };
 
 export type RuntimeSettingsEnv = {
@@ -51,6 +52,7 @@ export type ResolvedRuntimeSettings = {
   defaultEventVisibility: RuntimeEventVisibility;
   directUploadEnabled: boolean;
   logoMarkEnabled: boolean;
+  cfImagesEnabled: boolean;
 };
 
 export const DEFAULT_RUNTIME_SETTINGS: Omit<
@@ -73,6 +75,7 @@ export const DEFAULT_RUNTIME_SETTINGS: Omit<
   defaultEventVisibility: "DRAFT",
   directUploadEnabled: true,
   logoMarkEnabled: true,
+  cfImagesEnabled: false,
 };
 
 function cleanOptionalString(value: string | null | undefined) {
@@ -162,5 +165,7 @@ export function resolveRuntimeSettings(args: {
       record?.directUploadEnabled ?? DEFAULT_RUNTIME_SETTINGS.directUploadEnabled,
     logoMarkEnabled:
       record?.logoMarkEnabled ?? DEFAULT_RUNTIME_SETTINGS.logoMarkEnabled,
+    cfImagesEnabled:
+      record?.cfImagesEnabled ?? DEFAULT_RUNTIME_SETTINGS.cfImagesEnabled,
   };
 }

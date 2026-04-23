@@ -441,6 +441,7 @@ export async function updateAppSettingsAction(
       ),
       directUploadEnabled: asBoolean(formData.get("directUploadEnabled")),
       logoMarkEnabled: asBoolean(formData.get("logoMarkEnabled")),
+      cfImagesEnabled: asBoolean(formData.get("cfImagesEnabled")),
     },
     create: {
       id: "default",
@@ -470,6 +471,7 @@ export async function updateAppSettingsAction(
       ),
       directUploadEnabled: asBoolean(formData.get("directUploadEnabled")),
       logoMarkEnabled: asBoolean(formData.get("logoMarkEnabled")),
+      cfImagesEnabled: asBoolean(formData.get("cfImagesEnabled")),
     },
   });
 

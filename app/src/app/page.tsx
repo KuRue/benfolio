@@ -14,13 +14,18 @@ export default async function Home() {
           profile={siteProfile}
           showSearch={runtimeSettings.publicSearchEnabled}
           showLogoMark={runtimeSettings.logoMarkEnabled}
+          cfEnabled={runtimeSettings.cfImagesEnabled}
         />
 
         <section>
           {events.length ? (
             <div className="grid justify-center gap-4 xl:gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(18rem,100%),22rem))]">
               {events.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  cfEnabled={runtimeSettings.cfImagesEnabled}
+                />
               ))}
             </div>
           ) : (

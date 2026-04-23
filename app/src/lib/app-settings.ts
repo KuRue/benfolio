@@ -89,4 +89,5 @@ export const defaultAppSettingsValues = {
   defaultEventVisibility: DEFAULT_RUNTIME_SETTINGS.defaultEventVisibility,
   directUploadEnabled: DEFAULT_RUNTIME_SETTINGS.directUploadEnabled,
   logoMarkEnabled: DEFAULT_RUNTIME_SETTINGS.logoMarkEnabled,
+  cfImagesEnabled: DEFAULT_RUNTIME_SETTINGS.cfImagesEnabled,
 } as const;
