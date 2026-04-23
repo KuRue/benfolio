@@ -103,9 +103,9 @@ export function SiteHeader({
   const coverPosition = `${profile.coverFocalX ?? 50}% ${profile.coverFocalY ?? 50}%`;
 
   return (
-    <section className="relative isolate min-h-[29rem] overflow-hidden rounded-[2rem] border border-white/8 bg-[#050505] shadow-[0_34px_110px_rgba(0,0,0,0.38)] sm:min-h-[30rem] lg:min-h-[32rem]">
+    <section className="relative left-1/2 isolate min-h-[29rem] w-screen -translate-x-1/2 overflow-hidden bg-[#050505] sm:min-h-[30rem] lg:min-h-[32rem]">
       {coverUrl ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[72%] opacity-[0.98]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[74%] opacity-[0.98]">
           <BlurUpImage
             src={coverUrl}
             srcSet={coverSrcSet}
@@ -117,12 +117,12 @@ export function SiteHeader({
           />
         </div>
       ) : (
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[72%] bg-[radial-gradient(circle_at_top_left,_rgba(197,146,92,0.26),_transparent_36%),linear-gradient(135deg,_#151515_0%,_#0b0b0b_48%,_#1a1a1a_100%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[74%] bg-[radial-gradient(circle_at_top_left,_rgba(197,146,92,0.26),_transparent_36%),linear-gradient(135deg,_#151515_0%,_#0b0b0b_48%,_#1a1a1a_100%)]" />
       )}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(197,150,92,0.16),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(255,255,255,0.08),_transparent_24%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_30%,_rgba(0,0,0,0.3)_100%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[72%] bg-gradient-to-b from-black/28 via-black/18 to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[72%] bg-gradient-to-t from-[#050505] via-[#050505]/92 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[74%] bg-gradient-to-b from-black/24 via-transparent via-[62%] to-[#050505]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-[#050505] via-[#050505]/96 via-[42%] to-transparent" />
 
       {showLogoMark ? (
         <div className="absolute left-4 top-4 z-20 sm:left-5 sm:top-5">
@@ -142,18 +142,20 @@ export function SiteHeader({
 
       <div className="relative z-10 flex min-h-[29rem] flex-col items-center justify-end px-4 pb-6 pt-20 text-center sm:min-h-[30rem] sm:px-6 sm:pb-7 lg:min-h-[32rem] lg:pb-8">
         <div className="flex w-full max-w-3xl flex-col items-center">
-          <div className="h-[6.35rem] w-[6.35rem] overflow-hidden rounded-full border-2 border-[#7863ff]/72 bg-white/8 shadow-[0_0_0_7px_rgba(0,0,0,0.32),0_24px_70px_rgba(0,0,0,0.55)] sm:h-[7rem] sm:w-[7rem]">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_50%),linear-gradient(135deg,_rgba(120,99,255,0.42),_rgba(255,255,255,0.06))] font-serif text-[2rem] text-white/90">
-                {getMonogram(profile.displayName)}
-              </div>
-            )}
+          <div className="relative rounded-full bg-[conic-gradient(from_210deg,_#7d6bff,_#2bc4ff,_#7d6bff,_#b285ff,_#7d6bff)] p-[3px] shadow-[0_0_0_7px_rgba(0,0,0,0.34),0_0_34px_rgba(125,107,255,0.42),0_24px_70px_rgba(0,0,0,0.55)]">
+            <div className="h-[6.35rem] w-[6.35rem] overflow-hidden rounded-full border border-black/70 bg-white/8 sm:h-[7rem] sm:w-[7rem]">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_50%),linear-gradient(135deg,_rgba(120,99,255,0.42),_rgba(255,255,255,0.06))] font-serif text-[2rem] text-white/90">
+                  {getMonogram(profile.displayName)}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-4 min-w-0 space-y-2">
@@ -177,10 +179,10 @@ export function SiteHeader({
               href={profileLink.href}
               target="_blank"
               rel="noreferrer"
-              className="floating-action mt-5 inline-flex min-w-[13rem] items-center justify-center gap-4 rounded-full px-7 py-3.5 text-sm text-white/88 transition hover:bg-white/12 hover:text-white sm:min-w-[15rem] sm:text-base"
+              className="floating-action relative mt-5 inline-flex min-w-[13rem] items-center justify-center gap-4 overflow-hidden rounded-full px-7 py-3.5 text-sm text-white/88 transition before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-8 before:bg-[radial-gradient(ellipse_at_top,_rgba(147,129,255,0.42),_rgba(43,196,255,0.16)_34%,_transparent_72%)] before:blur-md hover:bg-white/12 hover:text-white sm:min-w-[15rem] sm:text-base"
             >
-              <span>{profileLink.label}</span>
-              <ArrowRight aria-hidden className="h-5 w-5" />
+              <span className="relative z-10">{profileLink.label}</span>
+              <ArrowRight aria-hidden className="relative z-10 h-5 w-5" />
             </Link>
           ) : null}
         </div>

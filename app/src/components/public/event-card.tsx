@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Calendar, ImageIcon, MapPin } from "lucide-react";
+import { Calendar, ImageIcon, MapPin } from "lucide-react";
 
 import { BlurUpImage } from "@/components/public/blur-up-image";
 import {
@@ -84,7 +84,7 @@ export function EventCard({ event, cfEnabled }: EventCardProps) {
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/20 to-black/8" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_34%,_rgba(0,0,0,0.22)_100%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
-        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+        <div className="absolute inset-x-0 bottom-0 p-4 pb-5 sm:p-5 sm:pb-6">
           <div className="space-y-3">
             <div className="space-y-1.5">
               {event.kicker ? (
@@ -112,13 +112,6 @@ export function EventCard({ event, cfEnabled }: EventCardProps) {
                   {event.location}
                 </span>
               ) : null}
-            </div>
-
-            <div className="flex items-center gap-3 pt-1 text-sm text-white/84">
-              <span className="floating-action inline-flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full bg-black/34 transition group-hover:bg-white group-hover:text-black">
-                <ArrowRight className="h-5 w-5" />
-              </span>
-              <span>View album</span>
             </div>
           </div>
         </div>
