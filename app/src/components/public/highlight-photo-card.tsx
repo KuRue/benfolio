@@ -53,11 +53,17 @@ export function HighlightPhotoCard({
   const imageUrl = transformedImage ?? photo.imageUrl;
   const title =
     photo.caption?.trim() ||
-    `${photo.event.title} highlight`;
+    photo.event.title;
 
   return (
     <Link
-      href={`/p/${photo.id}`}
+      href={{
+        pathname: `/p/${photo.id}`,
+        query: {
+          from: "/?section=highlights",
+        },
+      }}
+      scroll={false}
       className="group relative block overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/4 shadow-[0_18px_62px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16"
       style={{
         aspectRatio: `${photo.width} / ${photo.height}`,

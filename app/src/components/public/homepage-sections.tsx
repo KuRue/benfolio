@@ -9,6 +9,7 @@ import {
 import {
   type ReactNode,
   startTransition,
+  useEffect,
   useState,
 } from "react";
 
@@ -30,6 +31,10 @@ const sections: Array<{
   { id: "about", label: "About", Icon: UserRound },
 ];
 
+function isSectionId(value: string | null): value is SectionId {
+  return value === "albums" || value === "highlights" || value === "about";
+}
+
 export function HomepageSections({
   albums,
   highlights,
@@ -37,6 +42,16 @@ export function HomepageSections({
 }: HomepageSectionsProps) {
   const [activeSection, setActiveSection] = useState<SectionId>("albums");
   const activeIndex = sections.findIndex((section) => section.id === activeSection);
+
+  useEffect(() => {
+    const section = new URLSearchParams(window.location.search).get("section");
+
+    if (isSectionId(section)) {
+      startTransition(() => {
+        setActiveSection(section);
+      });
+    }
+  }, []);
 
   function showSection(id: SectionId) {
     startTransition(() => {

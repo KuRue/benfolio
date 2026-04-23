@@ -63,18 +63,7 @@ export default async function Home() {
             )
           }
           highlights={
-            <div className="space-y-4">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-[0.7rem] uppercase tracking-[0.28em] text-[#a097ff]">
-                    Highlights
-                  </p>
-                  <h2 className="mt-1 font-serif text-3xl tracking-[-0.045em] text-white sm:text-4xl">
-                    Selected photos
-                  </h2>
-                </div>
-              </div>
-
+            <>
               {highlights.length ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {highlights.map((photo) => (
@@ -90,7 +79,7 @@ export default async function Home() {
                   No highlights yet.
                 </div>
               )}
-            </div>
+            </>
           }
           about={
             <div className="mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b0b0d]/72 px-6 py-7 shadow-[0_24px_86px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.06)] sm:px-8 sm:py-9">
