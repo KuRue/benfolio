@@ -201,7 +201,7 @@ export function SiteProfileForm({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <p className="text-sm text-white/78">Banner crop</p>
-              <p className="text-sm text-white/48">Upload, then drag the frame.</p>
+              <p className="text-sm text-white/48">Drag inside the frame.</p>
             </div>
             <div className="text-xs uppercase tracking-[0.22em] text-white/40">
               {Math.round(coverFocalX)} / {Math.round(coverFocalY)}
@@ -209,8 +209,8 @@ export function SiteProfileForm({
           </div>
 
           <div
-            className="relative overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#090909] shadow-[0_20px_64px_rgba(0,0,0,0.28)]"
-            style={{ aspectRatio: "16 / 9" }}
+            className="relative cursor-crosshair overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#090909] shadow-[0_20px_64px_rgba(0,0,0,0.28)]"
+            style={{ aspectRatio: "21 / 10" }}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
               setFocusFromPointer(event, (x, y) => {
@@ -233,16 +233,18 @@ export function SiteProfileForm({
               <img
                 src={coverPreviewUrl}
                 alt=""
-                className="absolute inset-0 h-full w-full scale-[1.12] object-cover"
+                className="absolute inset-0 h-full w-full object-cover"
                 style={{ objectPosition: coverPosition }}
               />
             ) : (
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(197,146,92,0.26),_transparent_34%),linear-gradient(145deg,_#141414,_#070707)]" />
             )}
-            <div className="absolute inset-0 bg-black/18" />
-            <div className="absolute inset-x-[7%] top-[26%] bottom-[26%] rounded-[1.2rem] border border-white/18 bg-black/8 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]" />
+            <div className="absolute inset-0 bg-black/16" />
+            <div className="absolute inset-x-[5%] top-[17%] bottom-[17%] rounded-[1.2rem] border border-white/42 bg-transparent shadow-[0_0_0_999px_rgba(0,0,0,0.43),inset_0_0_0_1px_rgba(255,255,255,0.08)]" />
+            <div className="absolute left-1/2 top-[17%] h-[66%] w-px -translate-x-1/2 bg-white/18" />
+            <div className="absolute left-[5%] top-1/2 h-px w-[90%] -translate-y-1/2 bg-white/18" />
             <div
-              className="absolute h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/28 bg-black/34 shadow-[0_10px_28px_rgba(0,0,0,0.26)] backdrop-blur-xl"
+              className="absolute h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/34 bg-black/42 shadow-[0_10px_28px_rgba(0,0,0,0.26)] backdrop-blur-xl"
               style={{
                 left: `${coverFocalX}%`,
                 top: `${coverFocalY}%`,

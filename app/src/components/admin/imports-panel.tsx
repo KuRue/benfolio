@@ -401,11 +401,11 @@ export function ImportsPanel({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1.5">
-          <p className="editorial-label">Imports</p>
-          <h1 className="font-serif text-3xl tracking-[-0.03em] text-white sm:text-[2.45rem]">
+          <p className="editorial-label">Storage ingest</p>
+          <h1 className="font-serif text-3xl tracking-[-0.03em] text-white sm:text-[2.2rem]">
             Imports
           </h1>
         </div>
@@ -419,9 +419,9 @@ export function ImportsPanel({
         </button>
       </section>
 
-      <section className="admin-card space-y-4 px-5 py-5 sm:px-6 sm:py-6">
+      <section className="admin-card space-y-4 px-5 py-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="editorial-label">Status</p>
+          <p className="editorial-label">Queue</p>
           <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.22em] text-white/44">
             <span>{jobStatusSummary.PENDING ?? 0} jobs pending</span>
             <span>{jobStatusSummary.RUNNING ?? 0} running</span>
@@ -454,12 +454,9 @@ export function ImportsPanel({
         ) : null}
       </section>
 
-      <section className="admin-card space-y-4 px-5 py-5 sm:px-6 sm:py-6">
+      <section className="admin-card space-y-4 px-5 py-5">
         <div className="space-y-1.5">
           <p className="editorial-label">Filters</p>
-          <h2 className="font-serif text-[1.85rem] tracking-[-0.03em] text-white">
-            Filter imports
-          </h2>
         </div>
 
         <form
@@ -510,77 +507,80 @@ export function ImportsPanel({
           </div>
         </form>
 
-        <div className="grid gap-3 border-t border-white/8 pt-5 md:grid-cols-3">
-          <button
-            type="button"
-            disabled={pendingAction !== null || bulkActionSummary.retryFailed === 0}
-            onClick={() =>
-              void runBulkAction(
-                "retry-failed",
-                `Retry ${bulkActionSummary.retryFailed} failed import items in the current filter?`,
-              )
-            }
-            className="rounded-[1.3rem] border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
-          >
-            <span className="editorial-label">Retry</span>
-            <span className="mt-2 block text-white">Retry failed items</span>
-            <span className="mt-2 block text-white/52">{bulkActionSummary.retryFailed} visible</span>
-          </button>
-          <button
-            type="button"
-            disabled={
-              pendingAction !== null || bulkActionSummary.retryCleanupFailed === 0
-            }
-            onClick={() =>
-              void runBulkAction(
-                "retry-cleanup-failed",
-                `Retry cleanup for ${bulkActionSummary.retryCleanupFailed} failed import items in the current filter?`,
-              )
-            }
-            className="rounded-[1.3rem] border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
-          >
-            <span className="editorial-label">Cleanup</span>
-            <span className="mt-2 block text-white">Retry cleanup failures</span>
-            <span className="mt-2 block text-white/52">{bulkActionSummary.retryCleanupFailed} visible</span>
-          </button>
-          <button
-            type="button"
-            disabled={pendingAction !== null || bulkActionSummary.dismissTerminal === 0}
-            onClick={() =>
-              void runBulkAction(
-                "dismiss-terminal",
-                `Dismiss ${bulkActionSummary.dismissTerminal} completed or skipped items from the active queue? Failed items will remain visible.`,
-              )
-            }
-            className="rounded-[1.3rem] border border-white/10 bg-white/4 px-4 py-4 text-left text-sm text-white disabled:opacity-45"
-          >
-            <span className="editorial-label">Dismiss</span>
-            <span className="mt-2 block text-white">Dismiss complete and skipped</span>
-            <span className="mt-2 block text-white/52">{bulkActionSummary.dismissTerminal} visible</span>
-          </button>
-        </div>
+        {bulkActionSummary.retryFailed ||
+        bulkActionSummary.retryCleanupFailed ||
+        bulkActionSummary.dismissTerminal ? (
+          <div className="flex flex-wrap gap-2 border-t border-white/8 pt-5">
+            {bulkActionSummary.retryFailed ? (
+              <button
+                type="button"
+                disabled={pendingAction !== null}
+                onClick={() =>
+                  void runBulkAction(
+                    "retry-failed",
+                    `Retry ${bulkActionSummary.retryFailed} failed import items in the current filter?`,
+                  )
+                }
+                className="admin-button-muted"
+              >
+                Retry failed ({bulkActionSummary.retryFailed})
+              </button>
+            ) : null}
+            {bulkActionSummary.retryCleanupFailed ? (
+              <button
+                type="button"
+                disabled={pendingAction !== null}
+                onClick={() =>
+                  void runBulkAction(
+                    "retry-cleanup-failed",
+                    `Retry cleanup for ${bulkActionSummary.retryCleanupFailed} failed import items in the current filter?`,
+                  )
+                }
+                className="admin-button-muted"
+              >
+                Retry cleanup ({bulkActionSummary.retryCleanupFailed})
+              </button>
+            ) : null}
+            {bulkActionSummary.dismissTerminal ? (
+              <button
+                type="button"
+                disabled={pendingAction !== null}
+                onClick={() =>
+                  void runBulkAction(
+                    "dismiss-terminal",
+                    `Dismiss ${bulkActionSummary.dismissTerminal} completed or skipped items from the active queue? Failed items will remain visible.`,
+                  )
+                }
+                className="admin-button-muted"
+              >
+                Dismiss complete ({bulkActionSummary.dismissTerminal})
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="editorial-label">Jobs</p>
-            <h2 className="mt-2 font-serif text-[1.85rem] tracking-[-0.03em] text-white">
-              Job history
-            </h2>
-          </div>
+      <details className="admin-card px-5 py-5">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-4 text-white">
+          <span>
+            <span className="editorial-label block">Jobs</span>
+            <span className="mt-2 block font-serif text-[1.7rem] tracking-[-0.03em]">
+              Recent jobs
+            </span>
+          </span>
           <Link
             href="/admin/uploads"
             className="rounded-full border border-white/10 bg-white/4 px-4 py-2 text-sm text-white/72"
+            onClick={(event) => event.stopPropagation()}
           >
-            Open uploader
+            Uploader
           </Link>
-        </div>
+        </summary>
 
         {jobs.length ? (
-          <div className="grid gap-4">
+          <div className="mt-5 grid gap-3">
             {jobs.map((job) => (
-              <article key={job.id} className="admin-card space-y-5 px-6 py-6">
+              <article key={job.id} className="rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
@@ -691,11 +691,11 @@ export function ImportsPanel({
             ))}
           </div>
         ) : (
-          <div className="admin-card px-6 py-10 text-center text-sm text-white/58">
+          <div className="mt-5 rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-6 py-10 text-center text-sm text-white/58">
             No storage import jobs match the current filters.
           </div>
         )}
-      </section>
+      </details>
 
       <section className="space-y-4">
         <div>
@@ -813,45 +813,50 @@ export function ImportsPanel({
                   </div>
                 </div>
 
-                <div className="grid gap-3 text-sm text-white/58 md:grid-cols-2 xl:grid-cols-4">
-                  <div>
-                    <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
-                      Provider
-                    </p>
-                    <p className="mt-2 text-white/78">{item.sourceProvider ?? "Unknown"}</p>
+                <details className="rounded-3xl border border-white/8 bg-black/20 px-4 py-4">
+                  <summary className="cursor-pointer list-none text-sm text-white/78">
+                    Object details
+                  </summary>
+                  <div className="mt-4 grid gap-3 text-sm text-white/58 md:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                      <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
+                        Provider
+                      </p>
+                      <p className="mt-2 text-white/78">{item.sourceProvider ?? "Unknown"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
+                        ETag
+                      </p>
+                      <p className="mt-2 break-all text-white/78">
+                        {item.sourceEtag ?? "Not supplied"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
+                        Version
+                      </p>
+                      <p className="mt-2 break-all text-white/78">
+                        {item.sourceVersion ?? "Not supplied"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
+                        Source modified
+                      </p>
+                      <p className="mt-2 text-white/78">
+                        {formatRelativeState(item.sourceLastModified)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
-                      ETag
-                    </p>
-                    <p className="mt-2 break-all text-white/78">
-                      {item.sourceEtag ?? "Not supplied"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
-                      Version
-                    </p>
-                    <p className="mt-2 break-all text-white/78">
-                      {item.sourceVersion ?? "Not supplied"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[0.68rem] uppercase tracking-[0.24em] text-white/40">
-                      Source modified
-                    </p>
-                    <p className="mt-2 text-white/78">
-                      {formatRelativeState(item.sourceLastModified)}
-                    </p>
-                  </div>
-                </div>
 
-                {item.cleanupTargetKey ? (
-                  <p className="rounded-2xl border border-white/8 bg-black/25 px-4 py-3 text-sm text-white/58">
-                    Cleanup target:{" "}
-                    <span className="break-all text-white/74">{item.cleanupTargetKey}</span>
-                  </p>
-                ) : null}
+                  {item.cleanupTargetKey ? (
+                    <p className="mt-4 rounded-2xl border border-white/8 bg-black/25 px-4 py-3 text-sm text-white/58">
+                      Cleanup target:{" "}
+                      <span className="break-all text-white/74">{item.cleanupTargetKey}</span>
+                    </p>
+                  ) : null}
+                </details>
 
                 {item.skipReason ? (
                   <p className="rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-sm text-white/64">

@@ -280,13 +280,30 @@ body {
 
 .admin-select {
   appearance: none;
-  background-color: #0b0b0b;
+  background-color: #0b0b0b !important;
+  background-image:
+    linear-gradient(45deg, transparent 50%, rgba(243, 240, 235, 0.72) 50%),
+    linear-gradient(135deg, rgba(243, 240, 235, 0.72) 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.15rem) 50%,
+    calc(100% - 0.85rem) 50%;
+  background-size:
+    0.32rem 0.32rem,
+    0.32rem 0.32rem;
+  background-repeat: no-repeat;
+  color: #f3f0eb !important;
   color-scheme: dark;
+  padding-right: 2.6rem;
 }
 
 .admin-select option {
-  background: #0b0b0b;
-  color: #f3f0eb;
+  background: #0b0b0b !important;
+  color: #f3f0eb !important;
+}
+
+.admin-select option:checked {
+  background: #1c1c1c !important;
+  color: #fff !important;
 }
 
 .admin-textarea {

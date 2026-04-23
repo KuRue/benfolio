@@ -32,11 +32,10 @@ type EventCardProps = {
   cfEnabled: boolean;
 };
 
-// Cloudflare transformations: 3 widths cover mobile → xl grid
-// columns (~22rem max). ~3 transforms per unique event cover per
-// month, cached after that.
+// Cloudflare transformations: 3 widths cover mobile -> xl grid
+// columns, cached after the first transformed request.
 const GRID_WIDTHS = [480, 720, 960];
-const GRID_SIZES = "(min-width: 1280px) 22rem, (min-width: 640px) 40vw, 100vw";
+const GRID_SIZES = "(min-width: 1280px) 25rem, (min-width: 640px) 42vw, 100vw";
 
 export function EventCard({ event, cfEnabled }: EventCardProps) {
   const plainCoverUrl = buildDisplayUrl(event.coverDisplayKey);
@@ -68,12 +67,9 @@ export function EventCard({ event, cfEnabled }: EventCardProps) {
   return (
     <Link
       href={`/e/${event.slug}`}
-      className="group relative flex flex-col overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#0a0a0a] shadow-[0_18px_56px_rgba(0,0,0,0.24)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16 hover:shadow-[0_28px_84px_rgba(0,0,0,0.34)]"
+      className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/4 shadow-[0_20px_70px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16 hover:shadow-[0_30px_95px_rgba(0,0,0,0.36)]"
     >
-      {/* Image region — large hero. Keeps the photo the hero of the
-          card; metadata lives in the dark panel below rather than
-          being overlaid on top of the photograph. */}
-      <div className="relative aspect-[4/5] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(197,146,92,0.22),_transparent_32%),linear-gradient(145deg,_#111,_#050505)]">
+      <div className="relative aspect-[9/11] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(197,146,92,0.24),_transparent_32%),linear-gradient(145deg,_#111,_#050505)]">
         {coverUrl ? (
           <BlurUpImage
             src={coverUrl}
@@ -86,50 +82,45 @@ export function EventCard({ event, cfEnabled }: EventCardProps) {
             imgClassName="transition duration-700 group-hover:scale-[1.03] group-hover:saturate-[1.03]"
           />
         ) : null}
-        {/* Bottom fade into the info panel for a seamless transition. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/68 to-transparent" />
-      </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/20 to-black/8" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_34%,_rgba(0,0,0,0.22)_100%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              {event.kicker ? (
+                <p className="text-[0.74rem] uppercase tracking-[0.26em] text-[#8871ff] [text-shadow:_0_1px_12px_rgba(0,0,0,0.58)]">
+                  {event.kicker}
+                </p>
+              ) : null}
+              <h2 className="text-balance font-serif text-[2.35rem] leading-[0.96] tracking-[-0.05em] text-white [text-shadow:_0_3px_22px_rgba(0,0,0,0.62)] sm:text-[2.8rem]">
+                {event.title}
+              </h2>
+            </div>
 
-      {/* Info panel — editorial stack: kicker, title, metadata pill
-          chips, then a prominent CTA mirroring the in-bio link on the
-          site header. */}
-      <div className="flex flex-col gap-3 px-5 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
-        {event.kicker ? (
-          <p className="text-[0.68rem] font-medium uppercase tracking-[0.3em] text-[#c5965c]">
-            {event.kicker}
-          </p>
-        ) : null}
-        <h2 className="text-balance font-serif text-[1.95rem] leading-[1.02] tracking-[-0.035em] text-white sm:text-[2.2rem]">
-          {event.title}
-        </h2>
+            <div className="flex flex-wrap gap-2">
+              <span className="glass-chip px-3 py-2 text-sm text-white/82">
+                <Calendar className="h-[15px] w-[15px]" />
+                {formatDateRange(event.eventDate, event.eventEndDate, "short")}
+              </span>
+              <span className="glass-chip px-3 py-2 text-sm text-white/82">
+                <ImageIcon className="h-[15px] w-[15px]" />
+                {photoCountLabel}
+              </span>
+              {event.location ? (
+                <span className="glass-chip px-3 py-2 text-sm text-white/82">
+                  <MapPin className="h-[15px] w-[15px]" />
+                  {event.location}
+                </span>
+              ) : null}
+            </div>
 
-        <div className="flex flex-wrap gap-1.5 pt-0.5">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[0.72rem] text-white/70">
-            <Calendar className="h-3.5 w-3.5 text-white/58" />
-            <span>{formatDateRange(event.eventDate, event.eventEndDate, "short")}</span>
-            <span
-              aria-hidden
-              className="h-1 w-1 rounded-full bg-white/36"
-            />
-            <ImageIcon className="h-3.5 w-3.5 text-white/58" />
-            <span>{photoCountLabel}</span>
-          </span>
-          {event.location ? (
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[0.72rem] text-white/70">
-              <MapPin className="h-3.5 w-3.5 text-white/58" />
-              <span>{event.location}</span>
-            </span>
-          ) : null}
-        </div>
-
-        {/* Decorative CTA — the whole card is the anchor, so this is
-            an inline row rather than a button, keeping a single
-            clickable surface. */}
-        <div className="mt-2 inline-flex items-center gap-3 text-sm text-white/88">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/82 transition group-hover:border-[rgba(197,150,92,0.34)] group-hover:bg-[rgba(197,150,92,0.14)] group-hover:text-white">
-            <ArrowRight className="h-4 w-4" />
-          </span>
-          <span className="transition group-hover:text-white">View Album</span>
+            <div className="flex items-center gap-3 pt-1 text-sm text-white/84">
+              <span className="floating-action inline-flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full bg-black/34 transition group-hover:bg-white group-hover:text-black">
+                <ArrowRight className="h-5 w-5" />
+              </span>
+              <span>View album</span>
+            </div>
+          </div>
         </div>
       </div>
     </Link>

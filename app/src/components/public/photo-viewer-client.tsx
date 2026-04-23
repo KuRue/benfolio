@@ -254,45 +254,50 @@ export function PhotoViewerClient({
     });
   }
 
-  function clearControlsTimeout() {
+  const clearControlsTimeout = useCallback(() => {
     if (controlsTimeoutRef.current) {
       window.clearTimeout(controlsTimeoutRef.current);
       controlsTimeoutRef.current = null;
     }
-  }
+  }, []);
 
-  const scheduleHideControls = useEffectEvent(() => {
+  const scheduleHideControls = useCallback(() => {
     clearControlsTimeout();
     if (infoOpen) {
       return;
     }
     controlsTimeoutRef.current = window.setTimeout(() => {
       setControlsVisible(false);
-    }, touchLayout ? 5000 : 4000);
-  });
+    }, touchLayout ? 3200 : 2200);
+  }, [clearControlsTimeout, infoOpen, touchLayout]);
 
   function revealControls() {
     setControlsVisible(true);
     scheduleHideControls();
   }
 
+  function toggleInfoPanel() {
+    setControlsVisible(true);
+    setInfoOpen((current) => !current);
+  }
+
   function handleClose() {
+    const targetHref = closeHref ?? eventHref;
+
     startTransition(() => {
-      // In modal mode (intercepted @modal/(.)p/[id] route), router.back() is the only
-      // thing that actually unmounts the parallel slot. router.replace updates the URL
-      // but leaves the modal painted. Fall through to closeHref/eventHref only when
-      // there's no history to pop (deep link / refreshed modal).
-      if (isModal && window.history.length > 1) {
-        router.back();
+      if (isModal) {
+        router.replace(targetHref, { scroll: false });
+
+        window.setTimeout(() => {
+          if (window.location.pathname.startsWith("/p/")) {
+            window.location.assign(targetHref);
+          }
+        }, 280);
+
         return;
       }
 
-      if (closeHref) {
-        router.replace(closeHref, { scroll: false });
-        return;
-      }
-
-      router.push(eventHref, { scroll: false });
+      router.push(targetHref, { scroll: false });
     });
   }
 
@@ -331,7 +336,6 @@ export function PhotoViewerClient({
   useEffect(() => {
     if (infoOpen) {
       clearControlsTimeout();
-      setControlsVisible(true);
       return;
     }
 
@@ -340,7 +344,7 @@ export function PhotoViewerClient({
     return () => {
       clearControlsTimeout();
     };
-  }, [infoOpen]);
+  }, [clearControlsTimeout, infoOpen, scheduleHideControls]);
 
   async function handleShare() {
     if (typeof navigator === "undefined") {
@@ -371,6 +375,74 @@ export function PhotoViewerClient({
       throw error;
     }
   }
+
+  const controlsLayer = (
+    <div
+      className={`pointer-events-none absolute inset-0 z-30 transition-opacity duration-300 ${
+        controlsVisible || infoOpen ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      <div className="absolute right-2 top-2 pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-black/48 px-1.5 py-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.34)] backdrop-blur-2xl sm:right-3 sm:top-3">
+        <button
+          type="button"
+          onClick={handleClose}
+          className={viewerActionClass()}
+          aria-label={isModal ? "Close viewer" : "Back to event"}
+        >
+          {isModal ? <X size={18} /> : <ArrowLeft size={18} />}
+        </button>
+        <button
+          type="button"
+          onClick={toggleInfoPanel}
+          className={viewerActionClass(infoOpen)}
+          aria-label={touchLayout ? "Toggle details sheet" : "Toggle details panel"}
+          aria-pressed={infoOpen}
+        >
+          <Info size={18} />
+        </button>
+        <button
+          type="button"
+          onClick={handleShare}
+          className={viewerActionClass(shareState !== "idle")}
+          aria-label="Share photo"
+        >
+          <Link2 size={18} />
+        </button>
+        {downloadHref ? (
+          <a
+            href={downloadHref}
+            className={viewerActionClass()}
+            aria-label="Download original"
+          >
+            <Download size={18} />
+          </a>
+        ) : null}
+      </div>
+
+      {!touchLayout ? (
+        <>
+          <button
+            type="button"
+            onClick={() => navigate(previousHref)}
+            disabled={!previousHref}
+            className="glass-panel viewer-control pointer-events-auto absolute left-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex"
+            aria-label="Previous photo"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(nextHref)}
+            disabled={!nextHref}
+            className="glass-panel viewer-control pointer-events-auto absolute right-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex"
+            aria-label="Next photo"
+          >
+            <ArrowRight size={18} />
+          </button>
+        </>
+      ) : null}
+    </div>
+  );
 
   return (
     <div
@@ -434,74 +506,6 @@ export function PhotoViewerClient({
             }
           }}
         >
-          <div
-            className={`pointer-events-none absolute inset-0 z-20 transition-opacity duration-300 ${
-              controlsVisible || infoOpen ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            <div className="absolute inset-x-0 top-0 flex justify-end px-3 pt-3 sm:px-4 sm:pt-4">
-              <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-black/42 px-1.5 py-1.5 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.34)]">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className={viewerActionClass()}
-                  aria-label={isModal ? "Close viewer" : "Back to event"}
-                >
-                  {isModal ? <X size={18} /> : <ArrowLeft size={18} />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInfoOpen((current) => !current)}
-                  className={viewerActionClass(infoOpen)}
-                  aria-label={touchLayout ? "Toggle details sheet" : "Toggle details panel"}
-                  aria-pressed={infoOpen}
-                >
-                  <Info size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShare}
-                  className={viewerActionClass(shareState !== "idle")}
-                  aria-label="Share photo"
-                >
-                  <Link2 size={18} />
-                </button>
-                {downloadHref ? (
-                  <a
-                    href={downloadHref}
-                    className={viewerActionClass()}
-                    aria-label="Download original"
-                  >
-                    <Download size={18} />
-                  </a>
-                ) : null}
-              </div>
-            </div>
-
-            {!touchLayout ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => navigate(previousHref)}
-                  disabled={!previousHref}
-                  className="glass-panel viewer-control pointer-events-auto absolute left-4 top-1/2 hidden -translate-y-1/2 lg:inline-flex"
-                  aria-label="Previous photo"
-                >
-                  <ArrowLeft size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(nextHref)}
-                  disabled={!nextHref}
-                  className="glass-panel viewer-control pointer-events-auto absolute right-4 top-1/2 hidden -translate-y-1/2 lg:inline-flex"
-                  aria-label="Next photo"
-                >
-                  <ArrowRight size={18} />
-                </button>
-              </>
-            ) : null}
-          </div>
-
           {imageUrl ? (
             <div className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] lg:p-1.5">
               <div
@@ -536,15 +540,19 @@ export function PhotoViewerClient({
                   decoding="async"
                   fetchPriority="high"
                   onLoad={() => setFullLoaded(true)}
-                  className={`relative z-10 max-h-[calc(100dvh-0.7rem)] w-auto max-w-[calc(100vw-0.7rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-1.2rem)] sm:max-w-[calc(100vw-1.2rem)] lg:max-h-[calc(100dvh-0.9rem)] ${
+                  className={`relative z-10 max-h-[calc(100dvh-0.65rem)] w-auto max-w-[calc(100vw-0.65rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-0.9rem)] sm:max-w-[calc(100vw-0.9rem)] lg:max-h-[calc(100dvh-0.8rem)] ${
                     fullLoaded ? "opacity-100" : "opacity-0"
                   }`}
                 />
               </div>
+              {controlsLayer}
             </div>
           ) : (
-            <div className="muted-panel px-8 py-10 text-sm text-white/55">
-              This photograph is still being processed.
+            <div className="muted-panel relative min-h-72 px-8 py-10 text-sm text-white/55">
+              {controlsLayer}
+              <div className="flex h-full min-h-56 items-center justify-center">
+                This photograph is still being processed.
+              </div>
             </div>
           )}
         </div>

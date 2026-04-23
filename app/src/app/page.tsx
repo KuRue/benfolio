@@ -8,8 +8,8 @@ export default async function Home() {
   const { siteProfile, runtimeSettings, events } = await getHomepageData();
 
   return (
-    <main className="pb-14 pt-1 sm:pt-2 lg:pt-3">
-      <div className="section-shell space-y-3 sm:space-y-4">
+    <main className="pb-14 pt-0 sm:pt-2">
+      <div className="section-shell space-y-4 sm:space-y-5">
         <SiteHeader
           profile={siteProfile}
           showSearch={runtimeSettings.publicSearchEnabled}
@@ -19,7 +19,7 @@ export default async function Home() {
 
         <section>
           {events.length ? (
-            <div className="grid justify-center gap-4 xl:gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(18rem,100%),22rem))]">
+            <div className="grid justify-center gap-4 xl:gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(19rem,100%),25rem))]">
               {events.map((event) => (
                 <EventCard
                   key={event.id}
