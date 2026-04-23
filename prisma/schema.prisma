@@ -125,6 +125,7 @@ model SiteProfile {
   handle            String?
   headline          String   @default("Event photography arranged with the feel of the original night.")
   bio               String   @default("A mobile-first archive for event coverage, client galleries, and private releases.")
+  aboutBio          String?
   location          String?
   contactEmail      String?
   websiteUrl        String?
@@ -181,6 +182,7 @@ model Photo {
   originalByteSize   BigInt
   contentHashSha256  String?              @db.VarChar(64)
   sortOrder          Int                  @default(0)
+  isHighlight        Boolean              @default(false)
   processingState    PhotoProcessingState @default(UPLOADED)
   title              String?
   altText            String?
@@ -213,7 +215,9 @@ model Photo {
 
   @@index([eventId, sortOrder])
   @@index([eventId, capturedAt])
+  @@index([eventId, isHighlight])
   @@index([processingState])
+  @@index([isHighlight, processingState])
   @@index([contentHashSha256])
 }
 

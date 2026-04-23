@@ -38,6 +38,14 @@ const bulkPhotoActionSchema = z.discriminatedUnion("action", [
     photoIds: z.array(z.string().min(1)).length(1),
   }),
   z.object({
+    action: z.literal("set-highlight"),
+    photoIds: z.array(z.string().min(1)).min(1).max(100),
+  }),
+  z.object({
+    action: z.literal("clear-highlight"),
+    photoIds: z.array(z.string().min(1)).min(1).max(100),
+  }),
+  z.object({
     action: z.literal("set-caption"),
     photoIds: z.array(z.string().min(1)).min(1).max(100),
     caption: z.string(),
@@ -319,6 +327,36 @@ export async function POST(request: Request) {
           summary: {
             updatedCount: 1,
             skippedCount: 0,
+          },
+        });
+      }
+
+      case "set-highlight":
+      case "clear-highlight": {
+        const highlighted = parsed.data.action === "set-highlight";
+
+        const result = await prisma.photo.updateMany({
+          where: {
+            id: {
+              in: photoIds,
+            },
+          },
+          data: {
+            isHighlight: highlighted,
+          },
+        });
+
+        revalidatePhotoContexts(photoContexts, {
+          includeHomepage: true,
+        });
+
+        return NextResponse.json({
+          message: highlighted
+            ? `Marked ${result.count} photos as highlights.`
+            : `Removed ${result.count} photos from highlights.`,
+          summary: {
+            updatedCount: result.count,
+            skippedCount: photoIds.length - result.count,
           },
         });
       }

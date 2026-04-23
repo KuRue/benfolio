@@ -11,6 +11,7 @@ const defaultSiteProfile = {
   handle: null,
   headline: "Event photography arranged with the feel of the original night.",
   bio: "A mobile-first archive for event coverage, client galleries, and private releases.",
+  aboutBio: null,
   location: null,
   contactEmail: null,
   websiteUrl: null,
@@ -111,7 +112,7 @@ export async function getSiteProfile() {
 }
 
 export async function getHomepageData() {
-  const [siteProfile, runtimeSettings, events] = await Promise.all([
+  const [siteProfile, runtimeSettings, events, highlights] = await Promise.all([
     getSiteProfile(),
     getResolvedRuntimeSettings(),
     prisma.event.findMany({
@@ -123,6 +124,32 @@ export async function getHomepageData() {
         _count: {
           select: {
             photos: true,
+          },
+        },
+      },
+    }),
+    prisma.photo.findMany({
+      where: {
+        isHighlight: true,
+        processingState: "READY",
+        event: {
+          visibility: "PUBLIC",
+        },
+      },
+      orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }],
+      take: 18,
+      include: {
+        event: {
+          select: {
+            title: true,
+            slug: true,
+            eventDate: true,
+            eventEndDate: true,
+          },
+        },
+        derivatives: {
+          orderBy: {
+            width: "desc",
           },
         },
       },
@@ -144,7 +171,34 @@ export async function getHomepageData() {
     };
   });
 
-  return { siteProfile, runtimeSettings, events: enrichedEvents };
+  const enrichedHighlights = highlights.map((photo) => {
+    const gridDerivative = pickDerivative(photo.derivatives, "GRID");
+    const viewerDerivative = pickDerivative(photo.derivatives, "VIEWER");
+    const thumbnailDerivative = pickDerivative(photo.derivatives, "THUMBNAIL");
+    const displayDerivative =
+      gridDerivative ?? viewerDerivative ?? thumbnailDerivative;
+
+    return {
+      id: photo.id,
+      caption: photo.caption,
+      altText: photo.altText,
+      originalFilename: photo.originalFilename,
+      width: displayDerivative?.width ?? photo.width ?? 1200,
+      height: displayDerivative?.height ?? photo.height ?? 1500,
+      displayKey: displayDerivative?.storageKey ?? null,
+      imageUrl: buildDisplayUrl(displayDerivative?.storageKey),
+      blurDataUrl: photo.blurDataUrl,
+      dominantColor: photo.dominantColor,
+      event: photo.event,
+    };
+  });
+
+  return {
+    siteProfile,
+    runtimeSettings,
+    events: enrichedEvents,
+    highlights: enrichedHighlights,
+  };
 }
 
 export async function getPublicEventBySlug(slug: string) {

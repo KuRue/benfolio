@@ -1,12 +1,16 @@
 import { EventCard } from "@/components/public/event-card";
+import { HighlightPhotoCard } from "@/components/public/highlight-photo-card";
+import { HomepageSections } from "@/components/public/homepage-sections";
 import { SiteHeader } from "@/components/public/site-header";
 import { getHomepageData } from "@/lib/gallery";
-import { ImageIcon, Sparkles, UserRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const { siteProfile, runtimeSettings, events } = await getHomepageData();
+  const { siteProfile, runtimeSettings, events, highlights } =
+    await getHomepageData();
+  const aboutBio =
+    siteProfile.aboutBio?.trim() || siteProfile.bio?.trim() || "";
 
   return (
     <main className="pb-14 pt-0 sm:pt-2">
@@ -18,51 +22,74 @@ export default async function Home() {
           cfEnabled={runtimeSettings.cfImagesEnabled}
         />
 
-        <nav
-          className="mx-auto grid max-w-4xl grid-cols-3 rounded-full border border-white/10 bg-black/22 p-1.5 text-sm text-white/58 shadow-[0_24px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl"
-          aria-label="Homepage sections"
-        >
-          <a
-            href="#albums"
-            className="flex items-center justify-center gap-2 rounded-full bg-white/8 px-3 py-3 text-white shadow-[0_12px_32px_rgba(125,107,255,0.2)]"
-            aria-current="page"
-          >
-            <ImageIcon className="h-4 w-4 text-[#9a8cff]" />
-            <span>Albums</span>
-          </a>
-          <a
-            href="#highlights"
-            className="flex items-center justify-center gap-2 rounded-full px-3 py-3 transition hover:bg-white/6 hover:text-white"
-          >
-            <Sparkles className="h-4 w-4" />
-            <span>Highlights</span>
-          </a>
-          <a
-            href="#about"
-            className="flex items-center justify-center gap-2 rounded-full px-3 py-3 transition hover:bg-white/6 hover:text-white"
-          >
-            <UserRound className="h-4 w-4" />
-            <span>About</span>
-          </a>
-        </nav>
+        <HomepageSections
+          albums={
+            events.length ? (
+              <div className="grid justify-center gap-4 xl:gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(19rem,100%),25rem))]">
+                {events.map((event) => (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    cfEnabled={runtimeSettings.cfImagesEnabled}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="solid-panel px-6 py-10 text-center text-sm text-white/56">
+                No public events yet.
+              </div>
+            )
+          }
+          highlights={
+            <div className="space-y-4">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-[0.7rem] uppercase tracking-[0.28em] text-[#a097ff]">
+                    Highlights
+                  </p>
+                  <h2 className="mt-1 font-serif text-3xl tracking-[-0.045em] text-white sm:text-4xl">
+                    Selected photos
+                  </h2>
+                </div>
+              </div>
 
-        <section id="albums">
-          {events.length ? (
-            <div className="grid justify-center gap-4 xl:gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(19rem,100%),25rem))]">
-              {events.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  cfEnabled={runtimeSettings.cfImagesEnabled}
-                />
-              ))}
+              {highlights.length ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {highlights.map((photo) => (
+                    <HighlightPhotoCard
+                      key={photo.id}
+                      photo={photo}
+                      cfEnabled={runtimeSettings.cfImagesEnabled}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="solid-panel px-6 py-9 text-center text-sm text-white/56">
+                  No highlights yet.
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="solid-panel px-6 py-10 text-center text-sm text-white/56">
-              No public events yet.
+          }
+          about={
+            <div className="mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b0b0d]/72 px-6 py-7 shadow-[0_24px_86px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.06)] sm:px-8 sm:py-9">
+              <p className="text-[0.7rem] uppercase tracking-[0.28em] text-[#a097ff]">
+                About
+              </p>
+              <h2 className="mt-2 font-serif text-4xl tracking-[-0.055em] text-white sm:text-5xl">
+                {siteProfile.displayName}
+              </h2>
+              <div className="mt-5 space-y-4 text-pretty text-base leading-7 text-white/68 sm:text-lg sm:leading-8">
+                {aboutBio ? (
+                  aboutBio.split(/\n{2,}/).map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))
+                ) : (
+                  <p>About details coming soon.</p>
+                )}
+              </div>
             </div>
-          )}
-        </section>
+          }
+        />
       </div>
     </main>
   );

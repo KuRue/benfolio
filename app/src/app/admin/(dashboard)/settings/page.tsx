@@ -63,6 +63,7 @@ export default async function AdminSettingsPage() {
           linkUrl: siteProfile.websiteUrl ?? siteProfile.instagramUrl ?? "",
           headline: siteProfile.headline,
           bio: siteProfile.bio,
+          aboutBio: siteProfile.aboutBio ?? "",
           coverFocalX: siteProfile.coverFocalX ?? 50,
           coverFocalY: siteProfile.coverFocalY ?? 50,
         }}

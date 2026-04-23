@@ -21,6 +21,7 @@ const defaultSiteProfile = {
   handle: null,
   headline: "Event photography arranged with the feel of the original night.",
   bio: "A mobile-first archive for event coverage, client galleries, and private releases.",
+  aboutBio: null,
   location: null,
   contactEmail: null,
   websiteUrl: null,

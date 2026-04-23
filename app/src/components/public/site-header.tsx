@@ -168,9 +168,11 @@ export function SiteHeader({
               </p>
             ) : null}
             {publicBio ? (
-              <p className="mx-auto max-w-xl overflow-hidden text-pretty text-[1.02rem] leading-7 text-white/72 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [text-shadow:_0_1px_14px_rgba(0,0,0,0.55)] sm:text-[1.12rem]">
-                {publicBio}
-              </p>
+              <div className="relative mx-auto max-w-xl overflow-hidden rounded-full border border-white/8 bg-white/[0.035] px-5 py-2 shadow-[0_18px_54px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[5px] before:pointer-events-none before:absolute before:inset-x-8 before:top-0 before:h-8 before:bg-[radial-gradient(ellipse_at_top,_rgba(147,129,255,0.24),_rgba(43,196,255,0.1)_38%,_transparent_72%)] before:blur-md before:content-['']">
+                <p className="relative z-10 overflow-hidden text-pretty text-[1.02rem] leading-7 text-white/76 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [text-shadow:_0_1px_14px_rgba(0,0,0,0.55)] sm:text-[1.12rem]">
+                  {publicBio}
+                </p>
+              </div>
             ) : null}
           </div>
 
@@ -179,7 +181,7 @@ export function SiteHeader({
               href={profileLink.href}
               target="_blank"
               rel="noreferrer"
-              className="floating-action relative mt-5 inline-flex min-w-[13rem] items-center justify-center gap-4 overflow-hidden rounded-full px-7 py-3.5 text-sm text-white/88 transition before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-8 before:bg-[radial-gradient(ellipse_at_top,_rgba(147,129,255,0.42),_rgba(43,196,255,0.16)_34%,_transparent_72%)] before:blur-md hover:bg-white/12 hover:text-white sm:min-w-[15rem] sm:text-base"
+              className="floating-action relative mt-5 inline-flex min-w-[13rem] items-center justify-center gap-4 overflow-hidden rounded-full border-white/14 bg-white/[0.045] px-7 py-3.5 text-sm text-white/88 shadow-[0_22px_72px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.09)] transition before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-8 before:bg-[radial-gradient(ellipse_at_top,_rgba(147,129,255,0.5),_rgba(43,196,255,0.18)_34%,_transparent_72%)] before:blur-md before:content-[''] hover:bg-white/12 hover:text-white sm:min-w-[15rem] sm:text-base"
             >
               <span className="relative z-10">{profileLink.label}</span>
               <ArrowRight aria-hidden className="relative z-10 h-5 w-5" />

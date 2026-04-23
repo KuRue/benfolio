@@ -309,6 +309,7 @@ export async function updateSiteProfileAction(
   const bio =
     asString(formData.get("bio")) ||
     "A mobile-first archive for event coverage, client galleries, and private releases.";
+  const aboutBio = asString(formData.get("aboutBio")) || null;
   const coverFocalX = normalizePercent(formData.get("coverFocalX"));
   const coverFocalY = normalizePercent(formData.get("coverFocalY"));
   const websiteUrl = normalizeOptionalUrl(linkUrlInput);
@@ -335,6 +336,7 @@ export async function updateSiteProfileAction(
       handle,
       headline,
       bio,
+      aboutBio,
       websiteUrl,
       instagramUrl: null,
       coverFocalX,
@@ -346,6 +348,7 @@ export async function updateSiteProfileAction(
       handle,
       headline,
       bio,
+      aboutBio,
       websiteUrl,
       instagramUrl: null,
       coverFocalX,

@@ -68,6 +68,7 @@ type EventPhotoManagerProps = {
       category: "CHARACTER" | "EVENT" | "SPECIES" | "MAKER" | "GENERAL";
     }>;
     isCover: boolean;
+    isHighlight: boolean;
   }>;
 };
 
@@ -268,6 +269,11 @@ function EventPhotoCard({
                     Cover
                   </span>
                 ) : null}
+                {photo.isHighlight ? (
+                  <span className="rounded-full border border-[#9588ff]/35 bg-[#9588ff]/12 px-3 py-1 text-[0.68rem] uppercase tracking-[0.28em] text-[#d9d5ff]">
+                    Highlight
+                  </span>
+                ) : null}
               </div>
               <div>
                 <p className="text-sm font-medium text-white/88">{photo.originalFilename}</p>
@@ -379,6 +385,48 @@ function EventPhotoCard({
                   : photo.isCover
                     ? "Current cover"
                     : "Set cover"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void onAction({
+                    actionKey: `highlight:${photo.id}`,
+                    request: async () => {
+                      const response = await fetch(`/api/admin/photos/${photo.id}`, {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          isHighlight: !photo.isHighlight,
+                        }),
+                      });
+
+                      const payload = (await response.json()) as {
+                        error?: string;
+                        message?: string;
+                      };
+
+                      if (!response.ok) {
+                        throw new Error(payload.error ?? "Unable to update highlight.");
+                      }
+
+                      return payload;
+                    },
+                  })
+                }
+                disabled={actionLocked}
+                className={
+                  photo.isHighlight
+                    ? "rounded-full border border-[#9588ff]/35 bg-[#9588ff]/12 px-3 py-2 text-sm text-[#d9d5ff] disabled:opacity-40"
+                    : "admin-button-muted px-3 py-2 text-sm"
+                }
+              >
+                {pendingAction === `highlight:${photo.id}`
+                  ? "Saving..."
+                  : photo.isHighlight
+                    ? "Unhighlight"
+                    : "Highlight"}
               </button>
             </div>
           </div>
@@ -717,6 +765,8 @@ export function EventPhotoManager({
       | "delete"
       | "retry-failed"
       | "reprocess-ready"
+      | "set-highlight"
+      | "clear-highlight"
       | "move-to-event"
       | "add-tags"
       | "remove-tags"
@@ -1160,6 +1210,34 @@ export function EventPhotoManager({
                         type="button"
                         onClick={() =>
                           void runBulkAction({
+                            action: "set-highlight",
+                          })
+                        }
+                        disabled={pendingAction !== null || pageSelectedIds.length === 0}
+                        className="admin-button-muted"
+                      >
+                        {pendingAction === "bulk:set-highlight"
+                          ? "Saving..."
+                          : `Highlight (${pageSelectedIds.length})`}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runBulkAction({
+                            action: "clear-highlight",
+                          })
+                        }
+                        disabled={pendingAction !== null || pageSelectedIds.length === 0}
+                        className="admin-button-muted"
+                      >
+                        {pendingAction === "bulk:clear-highlight"
+                          ? "Saving..."
+                          : "Remove highlight"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void runBulkAction({
                             action: "retry-failed",
                           })
                         }
@@ -1411,7 +1489,7 @@ export function EventPhotoManager({
             <div className="grid gap-4 xl:grid-cols-2">
               {photos.map((photo) => (
                 <EventPhotoCard
-                  key={`${photo.id}:${photo.processingState}:${photo.sortOrder}:${photo.caption ?? ""}:${photo.altText ?? ""}:${photo.takenAtOverride ?? ""}`}
+                  key={`${photo.id}:${photo.processingState}:${photo.sortOrder}:${photo.caption ?? ""}:${photo.altText ?? ""}:${photo.takenAtOverride ?? ""}:${photo.isHighlight}`}
                   eventId={eventId}
                   eventSlug={eventSlug}
                   photo={photo}

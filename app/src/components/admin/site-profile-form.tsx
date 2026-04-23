@@ -23,6 +23,7 @@ type SiteProfileFormProps = {
     linkUrl: string;
     headline: string;
     bio: string;
+    aboutBio: string;
     coverFocalX: number;
     coverFocalY: number;
   };
@@ -194,6 +195,16 @@ export function SiteProfileForm({
             defaultValue={initialValues.bio}
             className="admin-textarea"
             placeholder="Used if the short intro is blank."
+          />
+        </label>
+
+        <label className="block space-y-2 xl:col-span-2">
+          <span className="text-sm text-white/68">About section</span>
+          <textarea
+            name="aboutBio"
+            defaultValue={initialValues.aboutBio}
+            className="admin-textarea min-h-36"
+            placeholder="Longer public bio for the About tab."
           />
         </label>
 

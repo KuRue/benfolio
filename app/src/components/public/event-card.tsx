@@ -60,9 +60,7 @@ export function EventCard({ event, cfEnabled }: EventCardProps) {
     transformOptions,
   );
   const coverUrl = transformedCover ?? plainCoverUrl;
-  const photoCountLabel = `${event._count.photos} Photo${
-    event._count.photos === 1 ? "" : "s"
-  }`;
+  const photoCountLabel = String(event._count.photos);
 
   return (
     <Link
@@ -79,16 +77,17 @@ export function EventCard({ event, cfEnabled }: EventCardProps) {
             blurDataUrl={event.coverBlurDataUrl}
             dominantColor={event.coverDominantColor}
             objectPosition={coverPosition}
-            imgClassName="transition duration-700 group-hover:scale-[1.03] group-hover:saturate-[1.03]"
+            imgClassName="contrast-[1.08] saturate-[1.04] transition duration-700 group-hover:scale-[1.03] group-hover:contrast-[1.12] group-hover:saturate-[1.08]"
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/20 to-black/8" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,_rgba(0,0,0,0.58)_0%,_rgba(0,0,0,0.32)_34%,_rgba(0,0,0,0.08)_68%,_transparent_100%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_34%,_rgba(0,0,0,0.22)_100%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
         <div className="absolute inset-x-0 bottom-0 p-4 pb-5 sm:p-5 sm:pb-6">
           <div className="space-y-3">
             <div className="space-y-1.5">
               {event.kicker ? (
-                <p className="text-[0.74rem] uppercase tracking-[0.26em] text-[#8871ff] [text-shadow:_0_1px_12px_rgba(0,0,0,0.58)]">
+                <p className="text-[0.74rem] font-semibold uppercase tracking-[0.26em] text-[#9c8cff] [text-shadow:_0_1px_16px_rgba(0,0,0,0.76),_0_0_18px_rgba(126,107,255,0.38)]">
                   {event.kicker}
                 </p>
               ) : null}

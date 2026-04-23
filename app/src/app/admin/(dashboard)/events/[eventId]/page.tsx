@@ -111,6 +111,7 @@ export default async function EditEventPage({
             category: tag.category,
           })),
           isCover: photo.isCover,
+          isHighlight: photo.isHighlight,
         }))}
       />
 
