@@ -77,12 +77,12 @@ export function EventCard({ event, cfEnabled }: EventCardProps) {
             blurDataUrl={event.coverBlurDataUrl}
             dominantColor={event.coverDominantColor}
             objectPosition={coverPosition}
-            imgClassName="contrast-[1.08] saturate-[1.04] transition duration-700 group-hover:scale-[1.03] group-hover:contrast-[1.12] group-hover:saturate-[1.08]"
+            imgClassName="brightness-[1.06] contrast-[1.04] saturate-[1.04] transition duration-700 group-hover:scale-[1.03] group-hover:brightness-[1.1] group-hover:contrast-[1.08] group-hover:saturate-[1.08]"
           />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/20 to-black/8" />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,_rgba(0,0,0,0.58)_0%,_rgba(0,0,0,0.32)_34%,_rgba(0,0,0,0.08)_68%,_transparent_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_34%,_rgba(0,0,0,0.22)_100%)] opacity-80 transition-opacity duration-300 group-hover:opacity-100" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/14 to-transparent" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,_rgba(0,0,0,0.34)_0%,_rgba(0,0,0,0.18)_34%,_rgba(0,0,0,0.04)_68%,_transparent_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_40%,_rgba(0,0,0,0.14)_100%)] opacity-60 transition-opacity duration-300 group-hover:opacity-72" />
         <div className="absolute inset-x-0 bottom-0 p-4 pb-5 sm:p-5 sm:pb-6">
           <div className="space-y-3">
             <div className="space-y-1.5">

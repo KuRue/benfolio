@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+
 import { EventCard } from "@/components/public/event-card";
 import { HighlightPhotoCard } from "@/components/public/highlight-photo-card";
 import { HomepageSections } from "@/components/public/homepage-sections";
@@ -6,11 +9,30 @@ import { getHomepageData } from "@/lib/gallery";
 
 export const dynamic = "force-dynamic";
 
+function getProfileLinkLabel(linkHref: string, instagramUrl: string | null) {
+  if (instagramUrl && linkHref === instagramUrl) {
+    return "Instagram";
+  }
+
+  try {
+    return new URL(linkHref).hostname.replace(/^www\./, "");
+  } catch {
+    return "Link";
+  }
+}
+
 export default async function Home() {
   const { siteProfile, runtimeSettings, events, highlights } =
     await getHomepageData();
   const aboutBio =
     siteProfile.aboutBio?.trim() || siteProfile.bio?.trim() || "";
+  const profileLinkHref = siteProfile.websiteUrl ?? siteProfile.instagramUrl;
+  const profileLink = profileLinkHref
+    ? {
+        href: profileLinkHref,
+        label: getProfileLinkLabel(profileLinkHref, siteProfile.instagramUrl),
+      }
+    : null;
 
   return (
     <main className="pb-14 pt-0 sm:pt-2">
@@ -87,6 +109,17 @@ export default async function Home() {
                   <p>About details coming soon.</p>
                 )}
               </div>
+              {profileLink ? (
+                <Link
+                  href={profileLink.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="floating-action relative mt-7 inline-flex min-w-[13rem] items-center justify-center gap-4 overflow-hidden rounded-full border-white/14 bg-white/[0.045] px-7 py-3.5 text-sm text-white/88 shadow-[0_22px_72px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.09)] transition before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-8 before:bg-[radial-gradient(ellipse_at_top,_rgba(147,129,255,0.5),_rgba(43,196,255,0.18)_34%,_transparent_72%)] before:blur-md before:content-[''] hover:bg-white/12 hover:text-white sm:min-w-[15rem] sm:text-base"
+                >
+                  <span className="relative z-10">{profileLink.label}</span>
+                  <ArrowRight aria-hidden className="relative z-10 h-5 w-5" />
+                </Link>
+              ) : null}
             </div>
           }
         />

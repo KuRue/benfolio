@@ -1,6 +1,4 @@
 /* eslint-disable @next/next/no-img-element */
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 
 import { BlurUpImage } from "@/components/public/blur-up-image";
 import { PublicSiteMark } from "@/components/public/public-site-mark";
@@ -40,36 +38,6 @@ type SiteHeaderProps = {
 const COVER_WIDTHS = [960, 1440, 1920];
 const COVER_SIZES = "100vw";
 
-function getLinkLabel(linkHref: string, instagramUrl: string | null) {
-  if (instagramUrl && linkHref === instagramUrl) {
-    return "Instagram";
-  }
-
-  try {
-    return new URL(linkHref).hostname.replace(/^www\./, "");
-  } catch {
-    return "Link";
-  }
-}
-
-function buildProfileLinks(
-  websiteUrl: string | null,
-  instagramUrl: string | null,
-) {
-  const links: Array<{ href: string; label: string }> = [];
-  const seen = new Set<string>();
-
-  for (const href of [websiteUrl, instagramUrl]) {
-    if (!href || seen.has(href)) {
-      continue;
-    }
-    seen.add(href);
-    links.push({ href, label: getLinkLabel(href, instagramUrl) });
-  }
-
-  return links;
-}
-
 export function SiteHeader({
   profile,
   showSearch = true,
@@ -99,7 +67,6 @@ export function SiteHeader({
   );
   const coverUrl = transformedCover ?? plainCoverUrl;
   const publicBio = profile.headline.trim() || profile.bio.trim();
-  const profileLink = buildProfileLinks(profile.websiteUrl, profile.instagramUrl)[0] ?? null;
   const coverPosition = `${profile.coverFocalX ?? 50}% ${profile.coverFocalY ?? 50}%`;
 
   return (
@@ -142,8 +109,8 @@ export function SiteHeader({
 
       <div className="relative z-10 flex min-h-[29rem] flex-col items-center justify-end px-4 pb-6 pt-20 text-center sm:min-h-[30rem] sm:px-6 sm:pb-7 lg:min-h-[32rem] lg:pb-8">
         <div className="flex w-full max-w-3xl flex-col items-center">
-          <div className="relative rounded-full bg-[conic-gradient(from_210deg,_#7d6bff,_#2bc4ff,_#7d6bff,_#b285ff,_#7d6bff)] p-[3px] shadow-[0_0_0_7px_rgba(0,0,0,0.34),0_0_34px_rgba(125,107,255,0.42),0_24px_70px_rgba(0,0,0,0.55)]">
-            <div className="h-[6.35rem] w-[6.35rem] overflow-hidden rounded-full border border-black/70 bg-white/8 sm:h-[7rem] sm:w-[7rem]">
+          <div className="relative rounded-full bg-[conic-gradient(from_210deg,_#7d6bff,_#2bc4ff,_#7d6bff,_#b285ff,_#7d6bff)] p-[3px] shadow-[0_0_34px_rgba(125,107,255,0.42),0_24px_70px_rgba(0,0,0,0.55)]">
+            <div className="h-[6.35rem] w-[6.35rem] overflow-hidden rounded-full bg-white/8 sm:h-[7rem] sm:w-[7rem]">
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
@@ -168,25 +135,11 @@ export function SiteHeader({
               </p>
             ) : null}
             {publicBio ? (
-              <div className="relative mx-auto max-w-xl overflow-hidden rounded-full border border-white/8 bg-white/[0.035] px-5 py-2 shadow-[0_18px_54px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[5px] before:pointer-events-none before:absolute before:inset-x-8 before:top-0 before:h-8 before:bg-[radial-gradient(ellipse_at_top,_rgba(147,129,255,0.24),_rgba(43,196,255,0.1)_38%,_transparent_72%)] before:blur-md before:content-['']">
-                <p className="relative z-10 overflow-hidden text-pretty text-[1.02rem] leading-7 text-white/76 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [text-shadow:_0_1px_14px_rgba(0,0,0,0.55)] sm:text-[1.12rem]">
-                  {publicBio}
-                </p>
-              </div>
+              <p className="mx-auto max-w-xl overflow-hidden text-pretty text-[1.02rem] leading-7 text-white/76 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [text-shadow:_0_1px_14px_rgba(0,0,0,0.55)] sm:text-[1.12rem]">
+                {publicBio}
+              </p>
             ) : null}
           </div>
-
-          {profileLink ? (
-            <Link
-              href={profileLink.href}
-              target="_blank"
-              rel="noreferrer"
-              className="floating-action relative mt-5 inline-flex min-w-[13rem] items-center justify-center gap-4 overflow-hidden rounded-full border-white/14 bg-white/[0.045] px-7 py-3.5 text-sm text-white/88 shadow-[0_22px_72px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.09)] transition before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-8 before:bg-[radial-gradient(ellipse_at_top,_rgba(147,129,255,0.5),_rgba(43,196,255,0.18)_34%,_transparent_72%)] before:blur-md before:content-[''] hover:bg-white/12 hover:text-white sm:min-w-[15rem] sm:text-base"
-            >
-              <span className="relative z-10">{profileLink.label}</span>
-              <ArrowRight aria-hidden className="relative z-10 h-5 w-5" />
-            </Link>
-          ) : null}
         </div>
       </div>
     </section>

@@ -72,10 +72,10 @@ export function HighlightPhotoCard({
           blurDataUrl={photo.blurDataUrl}
           dominantColor={photo.dominantColor}
           loading="lazy"
-          imgClassName="contrast-[1.06] saturate-[1.04] transition duration-700 group-hover:scale-[1.035] group-hover:contrast-[1.12]"
+          imgClassName="brightness-[1.06] contrast-[1.03] saturate-[1.04] transition duration-700 group-hover:scale-[1.035] group-hover:brightness-[1.1] group-hover:contrast-[1.08]"
         />
       ) : null}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-88 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/64 via-black/8 to-transparent opacity-82 transition-opacity duration-300 group-hover:opacity-90" />
       <div className="absolute inset-x-0 bottom-0 space-y-1.5 p-4">
         <p className="text-[0.68rem] uppercase tracking-[0.24em] text-[#a097ff] [text-shadow:_0_1px_14px_rgba(0,0,0,0.8)]">
           {formatDateRange(photo.event.eventDate, photo.event.eventEndDate, "short")}
