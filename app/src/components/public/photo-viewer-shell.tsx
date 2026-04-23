@@ -38,6 +38,7 @@ type PhotoViewerShellProps = {
       category: "CHARACTER" | "EVENT" | "SPECIES" | "MAKER" | "GENERAL";
     }>;
     eventHref: string;
+    navigationContext?: "event" | "highlights";
     previousHref: string | null;
     nextHref: string | null;
   };
@@ -57,18 +58,28 @@ function sanitizeReturnHref(value?: string | null) {
   return value;
 }
 
-function withReturnHref(href: string | null, returnHref: string | null) {
+function withViewerParams(
+  href: string | null,
+  returnHref: string | null,
+  navigationContext?: "event" | "highlights",
+) {
   if (!href) {
     return null;
   }
 
-  if (!returnHref) {
-    return href;
+  const [pathname, queryString] = href.split("?");
+  const params = new URLSearchParams(queryString ?? "");
+
+  if (returnHref) {
+    params.set("from", returnHref);
   }
 
-  const params = new URLSearchParams();
-  params.set("from", returnHref);
-  return `${href}?${params.toString()}`;
+  if (navigationContext === "highlights") {
+    params.set("context", "highlights");
+  }
+
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
 }
 
 export function PhotoViewerShell({
@@ -123,8 +134,16 @@ export function PhotoViewerShell({
       subtitle={subtitle ?? ""}
       eventHref={viewer.eventHref}
       downloadHref={viewer.downloadsEnabled ? `/download/${viewer.id}` : null}
-      previousHref={withReturnHref(viewer.previousHref, normalizedReturnHref)}
-      nextHref={withReturnHref(viewer.nextHref, normalizedReturnHref)}
+      previousHref={withViewerParams(
+        viewer.previousHref,
+        normalizedReturnHref,
+        viewer.navigationContext,
+      )}
+      nextHref={withViewerParams(
+        viewer.nextHref,
+        normalizedReturnHref,
+        viewer.navigationContext,
+      )}
       closeHref={normalizedReturnHref ?? (!isModal ? viewer.eventHref : undefined)}
       infoRows={infoRows}
       tagGroups={tagGroups}

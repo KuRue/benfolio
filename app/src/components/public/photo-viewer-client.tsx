@@ -286,7 +286,7 @@ export function PhotoViewerClient({
 
     startTransition(() => {
       if (isModal) {
-        router.replace(targetHref, { scroll: false });
+        router.back();
 
         window.setTimeout(() => {
           if (window.location.pathname.startsWith("/p/")) {
@@ -378,11 +378,11 @@ export function PhotoViewerClient({
 
   const controlsLayer = (
     <div
-      className={`pointer-events-none absolute inset-0 z-30 transition-opacity duration-300 ${
+      className={`pointer-events-none fixed inset-0 z-30 transition-opacity duration-300 ${
         controlsVisible || infoOpen ? "opacity-100" : "opacity-0"
       }`}
     >
-      <div className="absolute right-2 top-2 pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-black/48 px-1.5 py-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.34)] backdrop-blur-2xl sm:right-3 sm:top-3">
+      <div className="absolute right-3 top-3 pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-black/48 px-1.5 py-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.34)] backdrop-blur-2xl sm:right-4 sm:top-4">
         <button
           type="button"
           onClick={handleClose}
@@ -425,7 +425,7 @@ export function PhotoViewerClient({
             type="button"
             onClick={() => navigate(previousHref)}
             disabled={!previousHref}
-            className="glass-panel viewer-control pointer-events-auto absolute left-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex"
+            className="glass-panel viewer-control pointer-events-auto absolute left-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex xl:left-5"
             aria-label="Previous photo"
           >
             <ArrowLeft size={18} />
@@ -434,7 +434,7 @@ export function PhotoViewerClient({
             type="button"
             onClick={() => navigate(nextHref)}
             disabled={!nextHref}
-            className="glass-panel viewer-control pointer-events-auto absolute right-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex"
+            className="glass-panel viewer-control pointer-events-auto absolute right-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex xl:right-5"
             aria-label="Next photo"
           >
             <ArrowRight size={18} />
@@ -496,8 +496,10 @@ export function PhotoViewerClient({
           </div>
         ) : null}
 
+        {controlsLayer}
+
         <div
-          className={`relative z-10 flex h-[100dvh] flex-1 items-center justify-center overflow-hidden px-2 py-2 sm:px-4 sm:py-4 lg:px-6 lg:py-6 ${
+          className={`relative z-10 flex h-[100dvh] flex-1 items-center justify-center overflow-hidden px-2 py-2 sm:px-4 sm:py-4 lg:px-6 lg:py-6 [@media(min-width:1024px)_and_(min-height:760px)]:py-16 ${
             !touchLayout && infoOpen ? "lg:pr-[27rem] xl:pr-[29rem]" : ""
           }`}
           onClick={() => {
@@ -540,16 +542,14 @@ export function PhotoViewerClient({
                   decoding="async"
                   fetchPriority="high"
                   onLoad={() => setFullLoaded(true)}
-                  className={`relative z-10 max-h-[calc(100dvh-0.65rem)] w-auto max-w-[calc(100vw-0.65rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-0.9rem)] sm:max-w-[calc(100vw-0.9rem)] lg:max-h-[calc(100dvh-0.8rem)] ${
+                  className={`relative z-10 max-h-[calc(100dvh-0.65rem)] w-auto max-w-[calc(100vw-0.65rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-0.9rem)] sm:max-w-[calc(100vw-0.9rem)] lg:max-h-[calc(100dvh-1.8rem)] [@media(min-width:1024px)_and_(min-height:760px)]:max-h-[calc(100dvh-8rem)] ${
                     fullLoaded ? "opacity-100" : "opacity-0"
                   }`}
                 />
               </div>
-              {controlsLayer}
             </div>
           ) : (
             <div className="muted-panel relative min-h-72 px-8 py-10 text-sm text-white/55">
-              {controlsLayer}
               <div className="flex h-full min-h-56 items-center justify-center">
                 This photograph is still being processed.
               </div>

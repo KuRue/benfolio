@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getEffectiveTakenAt } from "@/lib/photo-order";
 import { buildDisplayUrl } from "@/lib/storage";
 
+const HOMEPAGE_HIGHLIGHT_LIMIT = 18;
+
 const defaultSiteProfile = {
   id: "default",
   displayName: "Your Studio",
@@ -136,8 +138,8 @@ export async function getHomepageData() {
           visibility: "PUBLIC",
         },
       },
-      orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }],
-      take: 18,
+      orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }, { id: "asc" }],
+      take: HOMEPAGE_HIGHLIGHT_LIMIT,
       include: {
         event: {
           select: {
@@ -268,7 +270,14 @@ export async function getPublicEventBySlug(slug: string) {
   };
 }
 
-export async function getPhotoViewerData(photoId: string) {
+type PhotoViewerSequence = "event" | "highlights";
+
+export async function getPhotoViewerData(
+  photoId: string,
+  options?: {
+    sequence?: PhotoViewerSequence;
+  },
+) {
   const [runtimeSettings, photo] = await Promise.all([
     getResolvedRuntimeSettings(),
     prisma.photo.findUnique({
@@ -308,32 +317,68 @@ export async function getPhotoViewerData(photoId: string) {
     },
   };
 
-  const [previousPhoto, nextPhoto] = await Promise.all([
-    prisma.photo.findFirst({
+  let navigationContext: PhotoViewerSequence = "event";
+  let previousPhoto: {
+    id: string;
+    derivatives: Array<{ storageKey: string }>;
+  } | null = null;
+  let nextPhoto: {
+    id: string;
+    derivatives: Array<{ storageKey: string }>;
+  } | null = null;
+
+  if (options?.sequence === "highlights") {
+    const highlightPhotos = await prisma.photo.findMany({
       where: {
-        eventId: photo.eventId,
-        sortOrder: {
-          lt: photo.sortOrder,
+        isHighlight: true,
+        processingState: "READY",
+        event: {
+          visibility: "PUBLIC",
         },
       },
-      orderBy: {
-        sortOrder: "desc",
-      },
+      orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }, { id: "asc" }],
+      take: HOMEPAGE_HIGHLIGHT_LIMIT,
       select: neighbourDerivativeSelect,
-    }),
-    prisma.photo.findFirst({
-      where: {
-        eventId: photo.eventId,
-        sortOrder: {
-          gt: photo.sortOrder,
+    });
+    const highlightIndex = highlightPhotos.findIndex(
+      (highlightPhoto) => highlightPhoto.id === photo.id,
+    );
+
+    if (highlightIndex >= 0) {
+      navigationContext = "highlights";
+      previousPhoto = highlightPhotos[highlightIndex - 1] ?? null;
+      nextPhoto = highlightPhotos[highlightIndex + 1] ?? null;
+    }
+  }
+
+  if (navigationContext === "event") {
+    [previousPhoto, nextPhoto] = await Promise.all([
+      prisma.photo.findFirst({
+        where: {
+          eventId: photo.eventId,
+          sortOrder: {
+            lt: photo.sortOrder,
+          },
         },
-      },
-      orderBy: {
-        sortOrder: "asc",
-      },
-      select: neighbourDerivativeSelect,
-    }),
-  ]);
+        orderBy: {
+          sortOrder: "desc",
+        },
+        select: neighbourDerivativeSelect,
+      }),
+      prisma.photo.findFirst({
+        where: {
+          eventId: photo.eventId,
+          sortOrder: {
+            gt: photo.sortOrder,
+          },
+        },
+        orderBy: {
+          sortOrder: "asc",
+        },
+        select: neighbourDerivativeSelect,
+      }),
+    ]);
+  }
 
   const viewerDerivative = pickDerivative(photo.derivatives, "VIEWER");
   const gridDerivative = pickDerivative(photo.derivatives, "GRID");
@@ -346,6 +391,7 @@ export async function getPhotoViewerData(photoId: string) {
     ...photo,
     capturedAt: getEffectiveTakenAt(photo),
     eventHref: `/e/${photo.event.slug}`,
+    navigationContext,
     previousHref: previousPhoto ? `/p/${previousPhoto.id}` : null,
     nextHref: nextPhoto ? `/p/${nextPhoto.id}` : null,
     imageUrl:

@@ -10,6 +10,7 @@ type ModalPhotoPageProps = {
   }>;
   searchParams: Promise<{
     from?: string;
+    context?: string;
   }>;
 };
 
@@ -18,9 +19,11 @@ export default async function ModalPhotoPage({
   searchParams,
 }: ModalPhotoPageProps) {
   const { id } = await params;
-  const { from } = await searchParams;
+  const { from, context } = await searchParams;
   const [viewer] = await Promise.all([
-    getPhotoViewerData(id),
+    getPhotoViewerData(id, {
+      sequence: context === "highlights" ? "highlights" : "event",
+    }),
     trackPhotoView(id),
   ]);
 

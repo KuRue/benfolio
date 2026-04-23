@@ -15,6 +15,7 @@ type PhotoPageProps = {
   }>;
   searchParams: Promise<{
     from?: string;
+    context?: string;
   }>;
 };
 
@@ -73,9 +74,11 @@ export async function generateMetadata({
 
 export default async function PhotoPage({ params, searchParams }: PhotoPageProps) {
   const { id } = await params;
-  const { from } = await searchParams;
+  const { from, context } = await searchParams;
   const [viewer] = await Promise.all([
-    getPhotoViewerData(id),
+    getPhotoViewerData(id, {
+      sequence: context === "highlights" ? "highlights" : "event",
+    }),
     trackPhotoView(id),
   ]);
 

@@ -60,6 +60,7 @@ export function HighlightPhotoCard({
       href={{
         pathname: `/p/${photo.id}`,
         query: {
+          context: "highlights",
           from: "/?section=highlights",
         },
       }}
