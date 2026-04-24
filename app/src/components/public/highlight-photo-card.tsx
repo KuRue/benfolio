@@ -29,8 +29,9 @@ type HighlightPhotoCardProps = {
   cfEnabled: boolean;
 };
 
-const HIGHLIGHT_WIDTHS = [420, 640, 860];
+const HIGHLIGHT_WIDTHS = [420, 640, 860, 1200];
 const HIGHLIGHT_SIZES = "(min-width: 1280px) 22rem, (min-width: 768px) 30vw, 88vw";
+const WIDE_HIGHLIGHT_SIZES = "(min-width: 1280px) 44rem, (min-width: 768px) 60vw, 100vw";
 
 export function HighlightPhotoCard({
   photo,
@@ -54,6 +55,13 @@ export function HighlightPhotoCard({
   const title =
     photo.caption?.trim() ||
     photo.event.title;
+  const ratio = photo.height > 0 ? photo.width / photo.height : 1;
+  const isLandscape = ratio >= 1.18;
+  const tileClassName = isLandscape
+    ? "col-span-2 row-span-2"
+    : ratio >= 0.82
+      ? "row-span-2"
+      : "row-span-3";
 
   return (
     <Link
@@ -65,16 +73,13 @@ export function HighlightPhotoCard({
         },
       }}
       scroll={false}
-      className="group relative mb-3 block w-full break-inside-avoid overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/4 shadow-[0_18px_62px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16"
-      style={{
-        aspectRatio: `${photo.width} / ${photo.height}`,
-      }}
+      className={`group relative block h-full min-h-0 overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/4 shadow-[0_18px_62px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16 ${tileClassName}`}
     >
       {imageUrl ? (
         <BlurUpImage
           src={imageUrl}
           srcSet={srcSet}
-          sizes={HIGHLIGHT_SIZES}
+          sizes={isLandscape ? WIDE_HIGHLIGHT_SIZES : HIGHLIGHT_SIZES}
           alt={photo.altText ?? title}
           blurDataUrl={photo.blurDataUrl}
           dominantColor={photo.dominantColor}
