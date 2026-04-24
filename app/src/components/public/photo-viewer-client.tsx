@@ -39,6 +39,11 @@ type ViewerFrame = {
   alt: string;
 };
 
+type NavigationPreview = {
+  direction: 1 | -1;
+  imageUrl: string;
+};
+
 type PhotoViewerClientProps = {
   photoId: string;
   imageUrl: string | null;
@@ -77,6 +82,9 @@ function isTypingTarget(target: EventTarget | null) {
 function viewerActionClass(active = false) {
   return `viewer-control ${active ? "border-white/18 bg-white text-black shadow-[0_16px_34px_rgba(255,255,255,0.14)]" : ""}`;
 }
+
+const viewerImageClass =
+  "relative z-10 max-h-[calc(100dvh-0.65rem)] w-auto max-w-[calc(100vw-0.65rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-0.9rem)] sm:max-w-[calc(100vw-0.9rem)] lg:max-h-[calc(100dvh-1.8rem)] [@media(min-width:1024px)_and_(min-height:760px)]:max-h-[calc(100dvh-8rem)]";
 
 function ViewerFrameImage({
   frame,
@@ -123,11 +131,36 @@ function ViewerFrameImage({
           decoding="async"
           fetchPriority="high"
           onLoad={onLoad}
-          className={`relative z-10 max-h-[calc(100dvh-0.65rem)] w-auto max-w-[calc(100vw-0.65rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-0.9rem)] sm:max-w-[calc(100vw-0.9rem)] lg:max-h-[calc(100dvh-1.8rem)] [@media(min-width:1024px)_and_(min-height:760px)]:max-h-[calc(100dvh-8rem)] ${
+          className={`${viewerImageClass} ${
             loaded ? "opacity-100" : "opacity-0"
           }`}
         />
       ) : null}
+    </div>
+  );
+}
+
+function ViewerPreviewImage({
+  imageUrl,
+  alt,
+  dominantColor,
+}: {
+  imageUrl: string;
+  alt: string;
+  dominantColor: string | null;
+}) {
+  return (
+    <div
+      className="relative flex h-full w-full items-center justify-center"
+      style={{ backgroundColor: dominantColor ?? "#0c0c0c" }}
+    >
+      <img
+        src={imageUrl}
+        alt={alt}
+        aria-hidden
+        decoding="async"
+        className={viewerImageClass}
+      />
     </div>
   );
 }
@@ -237,17 +270,14 @@ export function PhotoViewerClient({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [sheetDragY, setSheetDragY] = useState(0);
   const [fullLoaded, setFullLoaded] = useState(false);
-  const [previousFrame, setPreviousFrame] = useState<ViewerFrame | null>(null);
-  const [slideActive, setSlideActive] = useState(false);
-  const [slideDirection, setSlideDirection] = useState<1 | -1>(1);
+  const [navigationPreview, setNavigationPreview] = useState<NavigationPreview | null>(null);
+  const [navigationPreviewActive, setNavigationPreviewActive] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const sheetTouchStartY = useRef<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
-  const currentFrameRef = useRef<ViewerFrame | null>(null);
   const lastPhotoIdRef = useRef(photoId);
-  const pendingDirectionRef = useRef<1 | -1>(1);
-  const slideTimeoutRef = useRef<number | null>(null);
-  const slideRafRef = useRef<number | null>(null);
+  const navigationTimeoutRef = useRef<number | null>(null);
+  const navigationRafRef = useRef<number | null>(null);
   const currentFrame = useMemo<ViewerFrame>(
     () => ({
       photoId,
@@ -281,49 +311,28 @@ export function PhotoViewerClient({
 
   useEffect(() => {
     if (lastPhotoIdRef.current !== photoId) {
-      const outgoingFrame = currentFrameRef.current;
-
-      if (outgoingFrame?.imageUrl) {
-        setPreviousFrame(outgoingFrame);
-        setSlideDirection(pendingDirectionRef.current);
-        setSlideActive(false);
-
-        if (slideRafRef.current) {
-          window.cancelAnimationFrame(slideRafRef.current);
-        }
-        slideRafRef.current = window.requestAnimationFrame(() => {
-          slideRafRef.current = window.requestAnimationFrame(() => {
-            setSlideActive(true);
-          });
-        });
-
-        if (slideTimeoutRef.current) {
-          window.clearTimeout(slideTimeoutRef.current);
-        }
-        slideTimeoutRef.current = window.setTimeout(() => {
-          setPreviousFrame(null);
-          setSlideActive(false);
-        }, 520);
-      }
-
-      setFullLoaded(false);
       lastPhotoIdRef.current = photoId;
-    }
 
-    currentFrameRef.current = currentFrame;
-  }, [
-    currentFrame,
-    photoId,
-  ]);
+      const resetFrame = window.requestAnimationFrame(() => {
+        setNavigationPreview(null);
+        setNavigationPreviewActive(false);
+        setFullLoaded(false);
+      });
+
+      return () => {
+        window.cancelAnimationFrame(resetFrame);
+      };
+    }
+  }, [photoId]);
 
   useEffect(() => {
     return () => {
-      if (slideTimeoutRef.current) {
-        window.clearTimeout(slideTimeoutRef.current);
+      if (navigationTimeoutRef.current) {
+        window.clearTimeout(navigationTimeoutRef.current);
       }
 
-      if (slideRafRef.current) {
-        window.cancelAnimationFrame(slideRafRef.current);
+      if (navigationRafRef.current) {
+        window.cancelAnimationFrame(navigationRafRef.current);
       }
     };
   }, []);
@@ -384,22 +393,60 @@ export function PhotoViewerClient({
     };
   }, [isModal]);
 
+  const runRouteNavigation = useCallback(
+    (href: string) => {
+      startTransition(() => {
+        if (isModal) {
+          router.replace(href, { scroll: false });
+          return;
+        }
+
+        router.push(href, { scroll: false });
+      });
+    },
+    [isModal, router],
+  );
+
   function navigate(href: string | null) {
-    if (!href) {
+    if (!href || navigationPreview) {
       return;
     }
 
     revealControls();
-    pendingDirectionRef.current = href === previousHref ? -1 : 1;
+    const direction = href === previousHref ? -1 : 1;
+    const previewUrl = direction === -1 ? previousImageUrl : nextImageUrl;
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    startTransition(() => {
-      if (isModal) {
-        router.replace(href, { scroll: false });
-        return;
-      }
+    if (!previewUrl || reduceMotion) {
+      runRouteNavigation(href);
+      return;
+    }
 
-      router.push(href, { scroll: false });
+    if (navigationTimeoutRef.current) {
+      window.clearTimeout(navigationTimeoutRef.current);
+    }
+
+    if (navigationRafRef.current) {
+      window.cancelAnimationFrame(navigationRafRef.current);
+    }
+
+    setNavigationPreview({
+      direction,
+      imageUrl: previewUrl,
     });
+    setNavigationPreviewActive(false);
+
+    navigationRafRef.current = window.requestAnimationFrame(() => {
+      navigationRafRef.current = window.requestAnimationFrame(() => {
+        setNavigationPreviewActive(true);
+      });
+    });
+
+    navigationTimeoutRef.current = window.setTimeout(() => {
+      runRouteNavigation(href);
+    }, 180);
   }
 
   const clearControlsTimeout = useCallback(() => {
@@ -659,26 +706,30 @@ export function PhotoViewerClient({
           {imageUrl ? (
             <div className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] lg:p-1.5">
               <div className="relative overflow-hidden rounded-[1.05rem] shadow-[0_24px_90px_rgba(0,0,0,0.36)]">
-                {previousFrame ? (
+                {navigationPreview ? (
                   <div
                     className="absolute inset-0 z-20 flex items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:hidden"
                     style={{
-                      transform: slideActive
-                        ? `translateX(${-slideDirection * 112}%)`
-                        : "translateX(0)",
+                      transform: navigationPreviewActive
+                        ? "translateX(0)"
+                        : `translateX(${navigationPreview.direction * 112}%)`,
                     }}
                     aria-hidden
                   >
-                    <ViewerFrameImage frame={previousFrame} loaded />
+                    <ViewerPreviewImage
+                      imageUrl={navigationPreview.imageUrl}
+                      alt={alt}
+                      dominantColor={dominantColor}
+                    />
                   </div>
                 ) : null}
                 <div
                   className="relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transform-none motion-reduce:transition-none"
                   style={{
-                    transform: previousFrame
-                      ? slideActive
-                        ? "translateX(0)"
-                        : `translateX(${slideDirection * 112}%)`
+                    transform: navigationPreview
+                      ? navigationPreviewActive
+                        ? `translateX(${-navigationPreview.direction * 112}%)`
+                        : "translateX(0)"
                       : "translateX(0)",
                   }}
                 >
