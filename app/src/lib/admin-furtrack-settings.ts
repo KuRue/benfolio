@@ -26,7 +26,13 @@ export async function updateAdminFurtrackSettings(args: {
   impersonate?: string | null;
   clearToken?: boolean;
 }) {
-  const authToken = args.authToken?.trim();
+  // Tolerate users pasting the token with a leading "Bearer " or surrounding
+  // quotes — store just the JWT so the Authorization header stays clean.
+  const authToken = args.authToken
+    ?.trim()
+    .replace(/^bearer\s+/i, "")
+    .replace(/^["']|["']$/g, "")
+    .trim();
   const baseUrl = args.baseUrl?.trim();
   const impersonate = args.impersonate?.trim();
 

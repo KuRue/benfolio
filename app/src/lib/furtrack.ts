@@ -482,27 +482,32 @@ export async function getFurtrackRuntimeSettings(): Promise<FurtrackRuntimeSetti
 }
 
 function furtrackApiHeaders(settings: FurtrackRuntimeSettings) {
+  // Note: deliberately no User-Agent here. When the request runs through
+  // curl_cffi with `impersonate=chrome*`, curl_cffi sets a UA + sec-ch-ua
+  // bundle that matches its TLS fingerprint. Forcing our own UA creates
+  // a UA/TLS mismatch that Furtrack's bot layer rejects with HTTP 400.
+  const bearer = settings.authToken
+    ? settings.authToken.replace(/^bearer\s+/i, "").trim()
+    : null;
+
   return {
     Accept: "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
     Origin: FURTRACK_PUBLIC_BASE_URL,
     Referer: `${FURTRACK_PUBLIC_BASE_URL}/`,
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 benfolio-furtrack-sync/0.1",
-    ...(settings.authToken
+    ...(bearer
       ? {
-          Authorization: `Bearer ${settings.authToken}`,
+          Authorization: `Bearer ${bearer}`,
         }
       : {}),
   };
 }
 
 function furtrackImageHeaders() {
+  // Same UA reasoning as furtrackApiHeaders — let curl_cffi own the UA.
   return {
     Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
     Referer: `${FURTRACK_PUBLIC_BASE_URL}/`,
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 benfolio-furtrack-match/0.1",
   };
 }
 
@@ -595,7 +600,11 @@ async function fetchWithCurlCffi(args: {
   const status = response.status ?? 0;
 
   if (status < 200 || status >= 300) {
-    throwFurtrackStatus(status);
+    throwFurtrackStatus({
+      status,
+      url: args.url,
+      body: response.bodyText,
+    });
   }
 
   if (args.responseType === "base64") {
@@ -623,7 +632,19 @@ async function fetchWithNode(args: {
   });
 
   if (!response.ok) {
-    throwFurtrackStatus(response.status);
+    // Read the body before throwing so the error message can include
+    // whatever Furtrack told us about the rejection.
+    let body: string | undefined;
+    try {
+      body = await response.text();
+    } catch {
+      body = undefined;
+    }
+    throwFurtrackStatus({
+      status: response.status,
+      url: args.url,
+      body,
+    });
   }
 
   if (args.responseType === "base64") {
@@ -633,24 +654,45 @@ async function fetchWithNode(args: {
   return response.text();
 }
 
-function throwFurtrackStatus(status: number): never {
-  if (status === 401) {
+function summarizeFurtrackBody(body: string | undefined) {
+  if (!body) {
+    return "";
+  }
+
+  const trimmed = body.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const snippet = trimmed.length > 240 ? `${trimmed.slice(0, 240)}…` : trimmed;
+  return ` — ${snippet.replace(/\s+/g, " ")}`;
+}
+
+function throwFurtrackStatus(args: {
+  status: number;
+  url: string;
+  body?: string;
+}): never {
+  const bodyHint = summarizeFurtrackBody(args.body);
+  const tail = ` (HTTP ${args.status} ${args.url}${bodyHint})`;
+
+  if (args.status === 401) {
     throw new Error(
-      "Furtrack requires a Bearer JWT token. Save one from the Furtrack admin page or set FURTRACK_AUTH_TOKEN.",
+      `Furtrack requires a Bearer JWT token. Save one from the Furtrack admin page or set FURTRACK_AUTH_TOKEN.${tail}`,
     );
   }
 
-  if (status === 403) {
+  if (args.status === 403) {
     throw new Error(
-      "Furtrack rejected the request. Use curl_cffi mode with a valid saved Bearer token.",
+      `Furtrack rejected the request. Use curl_cffi mode with a valid saved Bearer token.${tail}`,
     );
   }
 
-  if (status === 429) {
-    throw new Error("Furtrack rate limited the request. Wait and retry.");
+  if (args.status === 429) {
+    throw new Error(`Furtrack rate limited the request. Wait and retry.${tail}`);
   }
 
-  throw new Error(`Furtrack returned HTTP ${status}.`);
+  throw new Error(`Furtrack returned HTTP ${args.status}.${tail}`);
 }
 
 async function fetchFurtrackResource(args: {
