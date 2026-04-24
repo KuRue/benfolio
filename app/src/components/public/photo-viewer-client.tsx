@@ -110,16 +110,6 @@ function ViewerFrameImage({
       className="relative flex h-full w-full items-center justify-center"
       style={{ backgroundColor: frame.dominantColor ?? "#0c0c0c" }}
     >
-      {frame.blurDataUrl ? (
-        <img
-          src={frame.blurDataUrl}
-          alt=""
-          aria-hidden
-          className={`absolute inset-0 h-full w-full scale-[1.04] object-cover blur-[10px] transition-opacity duration-500 ${
-            loaded ? "opacity-20" : "opacity-35"
-          }`}
-        />
-      ) : null}
       {frame.placeholderUrl ? (
         <img
           src={frame.placeholderUrl}
@@ -127,7 +117,7 @@ function ViewerFrameImage({
           aria-hidden
           decoding="async"
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
-            loaded ? "opacity-0" : "opacity-45"
+            loaded ? "opacity-0" : "opacity-24"
           }`}
         />
       ) : null}
@@ -395,7 +385,17 @@ export function PhotoViewerClient({
       }
       const preloader = new window.Image();
       preloader.decoding = "async";
-      preloader.onload = () => rememberLoadedViewerImage(url);
+      preloader.onload = () => {
+        if (typeof preloader.decode !== "function") {
+          rememberLoadedViewerImage(url);
+          return;
+        }
+
+        preloader
+          .decode()
+          .then(() => rememberLoadedViewerImage(url))
+          .catch(() => rememberLoadedViewerImage(url));
+      };
       preloader.src = url;
     }
   }, [previousImageUrl, nextImageUrl]);
