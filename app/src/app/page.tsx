@@ -65,7 +65,7 @@ export default async function Home() {
           highlights={
             <>
               {highlights.length ? (
-                <div className="grid grid-cols-2 gap-3 [grid-auto-rows:5rem] sm:[grid-auto-rows:5.75rem] lg:grid-cols-4 lg:[grid-auto-rows:6.25rem] xl:grid-cols-6">
+                <div className="grid grid-cols-2 gap-3 [grid-auto-rows:6rem] sm:[grid-auto-rows:7rem] lg:grid-cols-3 lg:[grid-auto-rows:7.75rem] xl:grid-cols-4 xl:[grid-auto-rows:8.25rem]">
                   {highlights.map((photo) => (
                     <HighlightPhotoCard
                       key={photo.id}
