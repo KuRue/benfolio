@@ -86,6 +86,14 @@ function viewerActionClass(active = false) {
 const viewerImageClass =
   "relative z-10 max-h-[calc(100dvh-0.65rem)] w-auto max-w-[calc(100vw-0.65rem)] object-contain transition-opacity duration-300 sm:max-h-[calc(100dvh-0.9rem)] sm:max-w-[calc(100vw-0.9rem)] lg:max-h-[calc(100dvh-1.8rem)] [@media(min-width:1024px)_and_(min-height:760px)]:max-h-[calc(100dvh-8rem)]";
 
+const loadedViewerImageUrls = new Set<string>();
+
+function rememberLoadedViewerImage(url: string | null | undefined) {
+  if (url) {
+    loadedViewerImageUrls.add(url);
+  }
+}
+
 function ViewerFrameImage({
   frame,
   loaded,
@@ -271,7 +279,9 @@ export function PhotoViewerClient({
   const [touchLayout, setTouchLayout] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [sheetDragY, setSheetDragY] = useState(0);
-  const [fullLoaded, setFullLoaded] = useState(false);
+  const [fullLoadedUrl, setFullLoadedUrl] = useState<string | null>(() =>
+    imageUrl && loadedViewerImageUrls.has(imageUrl) ? imageUrl : null,
+  );
   const [navigationPreview, setNavigationPreview] = useState<NavigationPreview | null>(null);
   const [navigationPreviewActive, setNavigationPreviewActive] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -302,14 +312,25 @@ export function PhotoViewerClient({
       placeholderUrl,
     ],
   );
+  const fullLoaded = Boolean(
+    imageUrl &&
+      (fullLoadedUrl === imageUrl || loadedViewerImageUrls.has(imageUrl)),
+  );
+
+  function markCurrentImageLoaded() {
+    rememberLoadedViewerImage(imageUrl);
+    setFullLoadedUrl(imageUrl);
+  }
+
   // Ref callback instead of useRef because cached images can finish decoding
   // before React attaches its delegated load listener. Checking `.complete`
   // at commit time is the only reliable way to catch that case.
   const handleFullImageRef = useCallback((node: HTMLImageElement | null) => {
     if (node?.complete && node.naturalWidth > 0) {
-      setFullLoaded(true);
+      rememberLoadedViewerImage(imageUrl);
+      setFullLoadedUrl(imageUrl);
     }
-  }, []);
+  }, [imageUrl]);
 
   useEffect(() => {
     if (lastPhotoIdRef.current !== photoId) {
@@ -374,6 +395,7 @@ export function PhotoViewerClient({
       }
       const preloader = new window.Image();
       preloader.decoding = "async";
+      preloader.onload = () => rememberLoadedViewerImage(url);
       preloader.src = url;
     }
   }, [previousImageUrl, nextImageUrl]);
@@ -738,7 +760,7 @@ export function PhotoViewerClient({
                     frame={currentFrame}
                     loaded={fullLoaded}
                     onImageRef={handleFullImageRef}
-                    onLoad={() => setFullLoaded(true)}
+                    onLoad={markCurrentImageLoaded}
                   />
                 </div>
               </div>
