@@ -293,7 +293,7 @@ export function PhotoViewerClient({
   const router = useRouter();
   const [shareState, setShareState] = useState<"idle" | "copied" | "shared">("idle");
   const [infoOpen, setInfoOpen] = useState(false);
-  const [touchLayout, setTouchLayout] = useState(false);
+  const [touchLayout, setTouchLayout] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [sheetDragY, setSheetDragY] = useState(0);
   const [fullLoadedUrl, setFullLoadedUrl] = useState<string | null>(() =>
@@ -674,7 +674,7 @@ export function PhotoViewerClient({
             type="button"
             onClick={() => navigate(previousHref)}
             disabled={!previousHref}
-            className="glass-panel viewer-control pointer-events-auto absolute left-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex xl:left-5"
+            className="glass-panel viewer-control pointer-events-auto absolute left-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex xl:left-5 [@media(pointer:coarse)]:!hidden"
             aria-label="Previous photo"
           >
             <ArrowLeft size={18} />
@@ -683,7 +683,7 @@ export function PhotoViewerClient({
             type="button"
             onClick={() => navigate(nextHref)}
             disabled={!nextHref}
-            className="glass-panel viewer-control pointer-events-auto absolute right-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex xl:right-5"
+            className="glass-panel viewer-control pointer-events-auto absolute right-3 top-1/2 hidden -translate-y-1/2 lg:inline-flex xl:right-5 [@media(pointer:coarse)]:!hidden"
             aria-label="Next photo"
           >
             <ArrowRight size={18} />
