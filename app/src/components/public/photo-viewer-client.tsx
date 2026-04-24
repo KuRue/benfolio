@@ -107,7 +107,9 @@ function ViewerFrameImage({
           src={frame.blurDataUrl}
           alt=""
           aria-hidden
-          className="absolute inset-0 h-full w-full scale-[1.08] object-cover blur-[18px]"
+          className={`absolute inset-0 h-full w-full scale-[1.04] object-cover blur-[10px] transition-opacity duration-500 ${
+            loaded ? "opacity-20" : "opacity-35"
+          }`}
         />
       ) : null}
       {frame.placeholderUrl ? (
@@ -116,8 +118,8 @@ function ViewerFrameImage({
           alt=""
           aria-hidden
           decoding="async"
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
-            loaded ? "opacity-0" : "opacity-100"
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+            loaded ? "opacity-0" : "opacity-45"
           }`}
         />
       ) : null}
@@ -316,7 +318,6 @@ export function PhotoViewerClient({
       const resetFrame = window.requestAnimationFrame(() => {
         setNavigationPreview(null);
         setNavigationPreviewActive(false);
-        setFullLoaded(false);
       });
 
       return () => {
