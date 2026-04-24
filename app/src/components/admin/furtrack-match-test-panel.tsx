@@ -352,6 +352,7 @@ export function FurtrackMatchTestPanel({
             <span className="glass-chip px-4 py-2">
               {hasSavedToken || furtrackSettings.hasEnvToken ? "Auth set" : "No auth token"}
             </span>
+            <span className="glass-chip px-4 py-2">TLS {impersonate || "chrome"}</span>
             {selectedEvent ? (
               <span className="glass-chip px-4 py-2">{selectedEvent.eventDateLabel}</span>
             ) : null}
@@ -395,9 +396,9 @@ export function FurtrackMatchTestPanel({
           </div>
         </div>
 
-        <details className="muted-panel px-4 py-4">
+        <details open className="muted-panel px-4 py-4">
           <summary className="cursor-pointer list-none text-sm text-white/74">
-            Furtrack auth and advanced search
+            Furtrack connection and search options
           </summary>
           <div className="mt-4 space-y-4">
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,0.5fr)_auto]">
