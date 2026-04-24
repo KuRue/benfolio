@@ -310,18 +310,18 @@ export async function getPhotoViewerData(
       where: { kind: "VIEWER" as const },
       orderBy: { width: "desc" as const },
       take: 1,
-      select: { storageKey: true },
+      select: { storageKey: true, width: true, height: true },
     },
   };
 
   let navigationContext: PhotoViewerSequence = "event";
   let previousPhoto: {
     id: string;
-    derivatives: Array<{ storageKey: string }>;
+    derivatives: Array<{ storageKey: string; width: number; height: number }>;
   } | null = null;
   let nextPhoto: {
     id: string;
-    derivatives: Array<{ storageKey: string }>;
+    derivatives: Array<{ storageKey: string; width: number; height: number }>;
   } | null = null;
 
   if (options?.sequence === "highlights") {
@@ -400,7 +400,11 @@ export async function getPhotoViewerData(
     previousImageUrl: buildDisplayUrl(
       previousPhoto?.derivatives[0]?.storageKey ?? null,
     ),
+    previousImageWidth: previousPhoto?.derivatives[0]?.width ?? null,
+    previousImageHeight: previousPhoto?.derivatives[0]?.height ?? null,
     nextImageUrl: buildDisplayUrl(nextPhoto?.derivatives[0]?.storageKey ?? null),
+    nextImageWidth: nextPhoto?.derivatives[0]?.width ?? null,
+    nextImageHeight: nextPhoto?.derivatives[0]?.height ?? null,
     robotsNoIndex: photo.event.visibility === "HIDDEN",
     downloadsEnabled: runtimeSettings.downloadsEnabled,
     blurDataUrl: photo.blurDataUrl,

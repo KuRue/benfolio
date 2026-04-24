@@ -3,6 +3,7 @@
 
 import {
   startTransition,
+  type ReactNode,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -42,6 +43,8 @@ type ViewerFrame = {
 type NavigationPreview = {
   direction: 1 | -1;
   imageUrl: string;
+  imageWidth: number;
+  imageHeight: number;
 };
 
 type PhotoViewerClientProps = {
@@ -53,7 +56,11 @@ type PhotoViewerClientProps = {
   blurDataUrl: string | null;
   dominantColor: string | null;
   previousImageUrl: string | null;
+  previousImageWidth: number | null;
+  previousImageHeight: number | null;
   nextImageUrl: string | null;
+  nextImageWidth: number | null;
+  nextImageHeight: number | null;
   alt: string;
   title: string;
   subtitle: string;
@@ -140,12 +147,26 @@ function ViewerFrameImage({
   );
 }
 
+function ViewerPhotoFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] lg:p-1.5">
+      <div className="relative overflow-hidden rounded-[1.05rem] shadow-[0_24px_90px_rgba(0,0,0,0.36)]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function ViewerPreviewImage({
   imageUrl,
+  imageWidth,
+  imageHeight,
   alt,
   dominantColor,
 }: {
   imageUrl: string;
+  imageWidth: number;
+  imageHeight: number;
   alt: string;
   dominantColor: string | null;
 }) {
@@ -156,6 +177,8 @@ function ViewerPreviewImage({
     >
       <img
         src={imageUrl}
+        width={imageWidth}
+        height={imageHeight}
         alt={alt}
         aria-hidden
         decoding="async"
@@ -250,7 +273,11 @@ export function PhotoViewerClient({
   blurDataUrl,
   dominantColor,
   previousImageUrl,
+  previousImageWidth,
+  previousImageHeight,
   nextImageUrl,
+  nextImageWidth,
+  nextImageHeight,
   alt,
   title,
   subtitle,
@@ -438,11 +465,13 @@ export function PhotoViewerClient({
     revealControls();
     const direction = href === previousHref ? -1 : 1;
     const previewUrl = direction === -1 ? previousImageUrl : nextImageUrl;
+    const previewWidth = direction === -1 ? previousImageWidth : nextImageWidth;
+    const previewHeight = direction === -1 ? previousImageHeight : nextImageHeight;
     const reduceMotion =
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    if (!previewUrl || reduceMotion) {
+    if (!previewUrl || !previewWidth || !previewHeight || reduceMotion) {
       runRouteNavigation(href);
       return;
     }
@@ -458,6 +487,8 @@ export function PhotoViewerClient({
     setNavigationPreview({
       direction,
       imageUrl: previewUrl,
+      imageWidth: previewWidth,
+      imageHeight: previewHeight,
     });
     setNavigationPreviewActive(false);
 
@@ -469,7 +500,7 @@ export function PhotoViewerClient({
 
     navigationTimeoutRef.current = window.setTimeout(() => {
       runRouteNavigation(href);
-    }, 180);
+    }, 520);
   }
 
   const clearControlsTimeout = useCallback(() => {
@@ -727,11 +758,10 @@ export function PhotoViewerClient({
           }}
         >
           {imageUrl ? (
-            <div className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-1 shadow-[0_36px_120px_rgba(0,0,0,0.42)] lg:p-1.5">
-              <div className="relative overflow-hidden rounded-[1.05rem] shadow-[0_24px_90px_rgba(0,0,0,0.36)]">
+            <div className="relative h-full w-full overflow-hidden">
                 {navigationPreview ? (
                   <div
-                    className="absolute inset-0 z-20 flex items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:hidden"
+                    className="absolute inset-0 z-10 flex items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:hidden"
                     style={{
                       transform: navigationPreviewActive
                         ? "translateX(0)"
@@ -739,15 +769,19 @@ export function PhotoViewerClient({
                     }}
                     aria-hidden
                   >
-                    <ViewerPreviewImage
-                      imageUrl={navigationPreview.imageUrl}
-                      alt={alt}
-                      dominantColor={dominantColor}
-                    />
+                    <ViewerPhotoFrame>
+                      <ViewerPreviewImage
+                        imageUrl={navigationPreview.imageUrl}
+                        imageWidth={navigationPreview.imageWidth}
+                        imageHeight={navigationPreview.imageHeight}
+                        alt={alt}
+                        dominantColor={dominantColor}
+                      />
+                    </ViewerPhotoFrame>
                   </div>
                 ) : null}
                 <div
-                  className="relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transform-none motion-reduce:transition-none"
+                  className="absolute inset-0 z-20 flex items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transform-none motion-reduce:transition-none"
                   style={{
                     transform: navigationPreview
                       ? navigationPreviewActive
@@ -756,14 +790,15 @@ export function PhotoViewerClient({
                       : "translateX(0)",
                   }}
                 >
-                  <ViewerFrameImage
-                    frame={currentFrame}
-                    loaded={fullLoaded}
-                    onImageRef={handleFullImageRef}
-                    onLoad={markCurrentImageLoaded}
-                  />
+                  <ViewerPhotoFrame>
+                    <ViewerFrameImage
+                      frame={currentFrame}
+                      loaded={fullLoaded}
+                      onImageRef={handleFullImageRef}
+                      onLoad={markCurrentImageLoaded}
+                    />
+                  </ViewerPhotoFrame>
                 </div>
-              </div>
             </div>
           ) : (
             <div className="muted-panel relative min-h-72 px-8 py-10 text-sm text-white/55">
