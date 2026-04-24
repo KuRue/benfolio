@@ -5,8 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { getEffectiveTakenAt } from "@/lib/photo-order";
 import { buildDisplayUrl } from "@/lib/storage";
 
-const HOMEPAGE_HIGHLIGHT_LIMIT = 18;
-
 const defaultSiteProfile = {
   id: "default",
   displayName: "Your Studio",
@@ -139,7 +137,6 @@ export async function getHomepageData() {
         },
       },
       orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }, { id: "asc" }],
-      take: HOMEPAGE_HIGHLIGHT_LIMIT,
       include: {
         event: {
           select: {
@@ -337,7 +334,6 @@ export async function getPhotoViewerData(
         },
       },
       orderBy: [{ capturedAt: "desc" }, { createdAt: "desc" }, { id: "asc" }],
-      take: HOMEPAGE_HIGHLIGHT_LIMIT,
       select: neighbourDerivativeSelect,
     });
     const highlightIndex = highlightPhotos.findIndex(

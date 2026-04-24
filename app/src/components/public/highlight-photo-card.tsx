@@ -65,7 +65,7 @@ export function HighlightPhotoCard({
         },
       }}
       scroll={false}
-      className="group relative block overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/4 shadow-[0_18px_62px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16"
+      className="group relative mb-3 block w-full break-inside-avoid overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/4 shadow-[0_18px_62px_rgba(0,0,0,0.28)] transition duration-300 hover:-translate-y-0.5 hover:border-white/16"
       style={{
         aspectRatio: `${photo.width} / ${photo.height}`,
       }}
