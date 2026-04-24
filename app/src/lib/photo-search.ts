@@ -309,6 +309,30 @@ function getMatchedTagSummary(tags: SearchResultTag[]) {
     .join(" · ");
 }
 
+function candidateHasExactTagMatch(candidate: SearchCandidate, term: string) {
+  return candidate.tags.some(({ tag }) => {
+    if (tag.slug.toLowerCase() === term || equalsNormalized(tag.name, term)) {
+      return true;
+    }
+
+    return tag.aliases.some(
+      (alias) => alias.slug.toLowerCase() === term || equalsNormalized(alias.name, term),
+    );
+  });
+}
+
+function candidateHasPartialTagMatch(candidate: SearchCandidate, term: string) {
+  return candidate.tags.some(({ tag }) => {
+    if (includesNormalized(tag.slug, term) || includesNormalized(tag.name, term)) {
+      return true;
+    }
+
+    return tag.aliases.some(
+      (alias) => includesNormalized(alias.slug, term) || includesNormalized(alias.name, term),
+    );
+  });
+}
+
 function scoreCandidate(candidate: SearchCandidate, terms: string[]) {
   const eventYear = getDateYear(candidate.event.eventDate);
   const eventEndYear = getDateYear(candidate.event.eventEndDate);
@@ -320,13 +344,9 @@ function scoreCandidate(candidate: SearchCandidate, terms: string[]) {
   for (const term of terms) {
     let bestScore = 0;
 
-    if (matchedTags.some((tag) => tag.slug.toLowerCase() === term)) {
+    if (candidateHasExactTagMatch(candidate, term)) {
       bestScore = Math.max(bestScore, 120);
-    } else if (
-      matchedTags.some(
-        (tag) => includesNormalized(tag.slug, term) || includesNormalized(tag.name, term),
-      )
-    ) {
+    } else if (candidateHasPartialTagMatch(candidate, term)) {
       bestScore = Math.max(bestScore, 96);
     }
 

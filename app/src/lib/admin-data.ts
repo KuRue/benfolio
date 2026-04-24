@@ -426,6 +426,21 @@ export async function getAdminEventEditorData(
           createdAt: "asc",
         },
       },
+      externalLinks: {
+        where: {
+          source: "FURTRACK",
+          assetType: "PHOTO_POST",
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 1,
+        select: {
+          id: true,
+          externalId: true,
+          externalUrl: true,
+        },
+      },
     },
   });
 
@@ -474,6 +489,7 @@ export async function getAdminEventEditorData(
         previewHeight: preview?.height ?? photo.height ?? 1500,
         effectiveTakenAt,
         tags: photo.tags.map((photoTag) => photoTag.tag),
+        furtrackLink: photo.externalLinks[0] ?? null,
         isCover: photoMatchesAsset(photo, {
           originalKey: event.coverOriginalKey,
           displayKey: event.coverDisplayKey,

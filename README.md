@@ -262,6 +262,8 @@ For local Docker, Compose already injects working defaults. For production, poin
 - `IMPORTS_ARCHIVE_PREFIX`
 - `STORAGE_WEBHOOK_SECRET`
 - `STORAGE_WEBHOOK_SIGNATURE_HEADER`
+- `FURTRACK_AUTH_TOKEN`
+- `FURTRACK_BASE_URL`
 
 The app intentionally keeps originals private and serves downloads through `/download/[id]`.
 `S3_PUBLIC_ENDPOINT` should be a browser-reachable S3/R2 API origin for presigned direct
@@ -269,6 +271,59 @@ uploads. In local Docker that is `http://localhost:9000`; in production it shoul
 your public R2/S3 API endpoint rather than an internal-only service hostname.
 Storage-folder imports are scanned from the originals bucket under `imports/<event-slug>/...` by default.
 If `STORAGE_WEBHOOK_SECRET` is set, `/api/webhooks/storage` expects an HMAC-SHA256 signature in the configured header.
+
+### Furtrack tag import
+
+Admin photo cards include a Furtrack import control inside **Edit details**. Paste a
+Furtrack post URL, post ID, or raw Furtrack tag list and the app will:
+
+- map Furtrack tag prefixes into typed tags (`character`, `event`, `species`, `maker`, `general`)
+- create missing canonical tags
+- add Furtrack raw names and underscore variants as aliases
+- attach the tags to the selected photo
+- link the photo to the Furtrack post when a post ID is provided
+
+Furtrack post lookups use `GET /view/post/{postId}` against `FURTRACK_BASE_URL`, which
+defaults to `https://solar.furtrack.com`. If configured, `FURTRACK_AUTH_TOKEN` is sent as
+`Authorization: Bearer <token>`. Leave it blank if you only want to paste raw tag lists.
+
+The parser understands Furtrack numeric prefixes:
+
+- `1:` -> character
+- `2:` -> maker
+- `3:` -> general, stored as `Photographer: ...` because the local taxonomy does not have a photographer category yet
+- `5:` -> event
+- `6:` -> species
+
+Direct server-side fetches may still be blocked by Furtrack/Cloudflare because this app
+uses Node fetch, not browser TLS impersonation. If that happens, paste raw Furtrack tags
+into the admin import field for now. A future scraper sidecar can own curl_cffi/browser
+impersonation without changing the tag/search model.
+
+### Furtrack visual match test
+
+A hidden test page is available at `/admin/furtrack-match-test`. It is intentionally not
+linked from the admin navigation yet.
+
+Use it to compare one local photo ID against Furtrack candidate posts before building the
+full review workflow. Provide either:
+
+- Furtrack tags such as `5:FWA_2025` or `1:character_name`
+- explicit Furtrack post IDs
+
+The matcher:
+
+- loads the local processed derivative from private storage
+- fetches Furtrack candidate post metadata and images
+- computes a simple perceptual difference hash for each image
+- ranks candidates by visual similarity and aspect-ratio fit
+- returns confidence labels without importing tags during the normal test run
+- can sync tags for exact `100%` visual-hash matches from event-batch mode
+
+The **Sync 100% matches** action reruns the event match, filters to exact hash matches
+only, then imports Furtrack tags and creates Furtrack external links for those photos.
+It intentionally skips non-exact matches so the first writable version stays conservative.
+Near matches should still become a review queue before they write tags.
 
 ### Direct browser uploads (required for admin upload to work)
 
@@ -343,6 +398,7 @@ Seed behavior:
 - protected admin overview, event CRUD, and upload pages
 - protected admin imports page for scanning `imports/<event-slug>/...` storage prefixes
 - direct-upload signing API that sends originals straight from the browser to private object storage and then enqueues Redis jobs after registration
+- per-photo Furtrack tag import that maps Furtrack metadata into typed tags and aliases
 - imports scan flow that creates or reuses draft events, records per-file import items, and reuses the existing photo worker pipeline
 - targeted storage webhook route for object-create events under the imports prefix
 - adapter-based storage webhook parsing with generic S3 payloads plus a Cloudflare R2-oriented relay shape

@@ -110,6 +110,12 @@ export default async function EditEventPage({
             slug: tag.slug,
             category: tag.category,
           })),
+          furtrackLink: photo.furtrackLink
+            ? {
+                externalId: photo.furtrackLink.externalId,
+                externalUrl: photo.furtrackLink.externalUrl,
+              }
+            : null,
           isCover: photo.isCover,
           isHighlight: photo.isHighlight,
         }))}

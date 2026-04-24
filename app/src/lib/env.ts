@@ -46,6 +46,11 @@ const envSchema = z.object({
   STORAGE_WEBHOOK_SIGNATURE_HEADER: emptyStringAsUndefined(
     z.string().min(1).default("x-storage-webhook-signature"),
   ),
+  FURTRACK_AUTH_TOKEN: emptyStringAsUndefined(z.string().min(1).optional()),
+  FURTRACK_API_KEY: emptyStringAsUndefined(z.string().min(1).optional()),
+  FURTRACK_BASE_URL: emptyStringAsUndefined(
+    z.string().url().default("https://solar.furtrack.com"),
+  ),
 });
 
 export const env = envSchema.parse({
@@ -66,4 +71,7 @@ export const env = envSchema.parse({
   IMPORTS_ARCHIVE_PREFIX: process.env.IMPORTS_ARCHIVE_PREFIX,
   STORAGE_WEBHOOK_SECRET: process.env.STORAGE_WEBHOOK_SECRET,
   STORAGE_WEBHOOK_SIGNATURE_HEADER: process.env.STORAGE_WEBHOOK_SIGNATURE_HEADER,
+  FURTRACK_AUTH_TOKEN: process.env.FURTRACK_AUTH_TOKEN,
+  FURTRACK_API_KEY: process.env.FURTRACK_API_KEY,
+  FURTRACK_BASE_URL: process.env.FURTRACK_BASE_URL,
 });

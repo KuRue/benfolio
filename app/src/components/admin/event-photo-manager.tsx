@@ -67,6 +67,10 @@ type EventPhotoManagerProps = {
       slug: string;
       category: "CHARACTER" | "EVENT" | "SPECIES" | "MAKER" | "GENERAL";
     }>;
+    furtrackLink: {
+      externalId: string;
+      externalUrl: string | null;
+    } | null;
     isCover: boolean;
     isHighlight: boolean;
   }>;
@@ -188,6 +192,7 @@ function EventPhotoCard({
   onSaveMetadata,
   onAddTags,
   onRemoveTag,
+  onImportFurtrackTags,
 }: {
   eventId: string;
   eventSlug: string;
@@ -209,6 +214,10 @@ function EventPhotoCard({
   }) => Promise<void>;
   onAddTags: (args: { photoId: string; tags: TagDraft[] }) => Promise<void>;
   onRemoveTag: (args: { photoId: string; tag: TagDraft }) => Promise<void>;
+  onImportFurtrackTags: (args: {
+    photoId: string;
+    reference: string;
+  }) => Promise<void>;
 }) {
   const [caption, setCaption] = useState(photo.caption ?? "");
   const [altText, setAltText] = useState(photo.altText ?? "");
@@ -216,9 +225,13 @@ function EventPhotoCard({
     toDateTimeLocalValue(photo.takenAtOverride),
   );
   const [selectedTags, setSelectedTags] = useState<TagDraft[]>([]);
+  const [furtrackReference, setFurtrackReference] = useState(
+    photo.furtrackLink?.externalUrl ?? photo.furtrackLink?.externalId ?? "",
+  );
 
   const actionLocked = pendingAction !== null;
   const metadataPending = pendingAction === `save:${photo.id}`;
+  const furtrackPending = pendingAction === `furtrack:${photo.id}`;
   const canSetCover = photo.processingState === "READY" && !photo.isCover;
   const canReprocess =
     photo.processingState === "READY" || photo.processingState === "FAILED";
@@ -660,6 +673,52 @@ function EventPhotoCard({
                 </button>
               </div>
             </div>
+
+            <div className="mt-5 border-t border-white/8 pt-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm text-white/68">Furtrack</p>
+                  {photo.furtrackLink ? (
+                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-white/38">
+                      Linked post {photo.furtrackLink.externalId}
+                    </p>
+                  ) : null}
+                </div>
+                {photo.furtrackLink?.externalUrl ? (
+                  <a
+                    href={photo.furtrackLink.externalUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="admin-button-muted px-3 py-2 text-sm"
+                  >
+                    Open
+                  </a>
+                ) : null}
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <input
+                  value={furtrackReference}
+                  onChange={(event) => setFurtrackReference(event.target.value)}
+                  className="admin-input"
+                  placeholder="Post URL, post ID, or Furtrack tags"
+                  disabled={actionLocked}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    void onImportFurtrackTags({
+                      photoId: photo.id,
+                      reference: furtrackReference,
+                    })
+                  }
+                  disabled={actionLocked || !furtrackReference.trim()}
+                  className="admin-button-muted"
+                >
+                  {furtrackPending ? "Importing..." : "Import tags"}
+                </button>
+              </div>
+            </div>
           </details>
         </div>
       </div>
@@ -943,6 +1002,58 @@ export function EventPhotoManager({
       setNotice({
         tone: "error",
         text: error instanceof Error ? error.message : "Unable to remove tag.",
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
+  async function importFurtrackTagsToPhoto(args: {
+    photoId: string;
+    reference: string;
+  }) {
+    const reference = args.reference.trim();
+
+    if (!reference) {
+      setNotice({
+        tone: "error",
+        text: "Enter a Furtrack post URL, post ID, or tag list.",
+      });
+      return;
+    }
+
+    setPendingAction(`furtrack:${args.photoId}`);
+    setNotice(null);
+
+    try {
+      const response = await fetch(`/api/admin/photos/${args.photoId}/furtrack`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reference,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to import Furtrack tags.");
+      }
+
+      setNotice({
+        tone: "success",
+        text: payload.message ?? "Furtrack tags imported.",
+      });
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        text:
+          error instanceof Error ? error.message : "Unable to import Furtrack tags.",
       });
     } finally {
       setPendingAction(null);
@@ -1501,6 +1612,7 @@ export function EventPhotoManager({
                   onSaveMetadata={saveMetadata}
                   onAddTags={addTagsToPhoto}
                   onRemoveTag={removeTagFromPhoto}
+                  onImportFurtrackTags={importFurtrackTagsToPhoto}
                 />
               ))}
             </div>
