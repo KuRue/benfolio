@@ -51,6 +51,18 @@ const envSchema = z.object({
   FURTRACK_BASE_URL: emptyStringAsUndefined(
     z.string().url().default("https://solar.furtrack.com"),
   ),
+  FURTRACK_FETCH_MODE: emptyStringAsUndefined(
+    z.enum(["auto", "curl_cffi", "node"]).default("auto"),
+  ),
+  FURTRACK_CURL_CFFI_COMMAND: emptyStringAsUndefined(
+    z.string().min(1).default("python3"),
+  ),
+  FURTRACK_CURL_CFFI_SCRIPT: emptyStringAsUndefined(
+    z.string().min(1).default("scripts/furtrack_fetch.py"),
+  ),
+  FURTRACK_CURL_CFFI_IMPERSONATE: emptyStringAsUndefined(
+    z.string().min(1).default("chrome"),
+  ),
 });
 
 export const env = envSchema.parse({
@@ -74,4 +86,8 @@ export const env = envSchema.parse({
   FURTRACK_AUTH_TOKEN: process.env.FURTRACK_AUTH_TOKEN,
   FURTRACK_API_KEY: process.env.FURTRACK_API_KEY,
   FURTRACK_BASE_URL: process.env.FURTRACK_BASE_URL,
+  FURTRACK_FETCH_MODE: process.env.FURTRACK_FETCH_MODE,
+  FURTRACK_CURL_CFFI_COMMAND: process.env.FURTRACK_CURL_CFFI_COMMAND,
+  FURTRACK_CURL_CFFI_SCRIPT: process.env.FURTRACK_CURL_CFFI_SCRIPT,
+  FURTRACK_CURL_CFFI_IMPERSONATE: process.env.FURTRACK_CURL_CFFI_IMPERSONATE,
 });

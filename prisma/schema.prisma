@@ -110,6 +110,9 @@ model AppSettings {
   defaultEventVisibility   EventVisibility @default(DRAFT)
   directUploadEnabled      Boolean         @default(true)
   logoMarkEnabled          Boolean         @default(true)
+  furtrackAuthToken        String?
+  furtrackBaseUrl          String?
+  furtrackImpersonate      String?
   /// When true, public covers are served through the Cloudflare Image
   /// Transformations proxy (`/cdn-cgi/image/...`). Requires the app
   /// hostname to be proxied through Cloudflare (orange-cloud DNS OR

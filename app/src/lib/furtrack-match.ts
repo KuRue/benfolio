@@ -3,6 +3,7 @@ import "server-only";
 import sharp from "sharp";
 
 import {
+  loadFurtrackImageBuffer,
   loadFurtrackPost,
   loadFurtrackPostIdsByTag,
   type FurtrackPostDetail,
@@ -44,6 +45,14 @@ type LocalPhotoForMatch = {
     height: number;
     storageKey: string;
   }>;
+};
+
+type EventForCandidateTags = {
+  title: string;
+  slug: string;
+  kicker: string | null;
+  eventDate: Date;
+  eventEndDate: Date | null;
 };
 
 export type FurtrackVisualMatch = {
@@ -202,6 +211,61 @@ function confidenceForScore(score: number): FurtrackVisualMatch["confidence"] {
   return "LOW";
 }
 
+function normalizeFurtrackTagValue(value: string, options?: { lowerCase?: boolean }) {
+  const normalized = value
+    .replace(/&/g, " and ")
+    .replace(/['’]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return options?.lowerCase === false ? normalized : normalized.toLowerCase();
+}
+
+function buildEventTagSeeds(event: EventForCandidateTags) {
+  const years = [
+    event.eventDate.getUTCFullYear(),
+    event.eventEndDate?.getUTCFullYear(),
+  ]
+    .filter((year): year is number => Boolean(year))
+    .map(String);
+  const textSeeds = [
+    event.kicker,
+    event.title,
+    event.slug,
+    event.kicker && years[0] ? `${event.kicker} ${years[0]}` : null,
+    event.title && years[0] ? `${event.title} ${years[0]}` : null,
+  ].filter((value): value is string => Boolean(value?.trim()));
+  const normalized = new Set<string>();
+
+  for (const seed of textSeeds) {
+    const values = [
+      normalizeFurtrackTagValue(seed, { lowerCase: false }),
+      normalizeFurtrackTagValue(seed),
+    ];
+
+    for (const value of values) {
+      if (!value || value.length < 2) {
+        continue;
+      }
+
+      normalized.add(value);
+
+      for (const year of years) {
+        if (!value.includes(year)) {
+          normalized.add(`${value}_${year}`);
+        }
+      }
+
+      const withoutYear = value.replace(/_?(20\d{2})$/, "");
+      if (withoutYear && withoutYear !== value) {
+        normalized.add(withoutYear);
+      }
+    }
+  }
+
+  return [...normalized].map((value) => `5:${value}`);
+}
+
 async function fingerprintImage(buffer: Buffer): Promise<ImageFingerprint> {
   const metadata = await sharp(buffer).rotate().metadata();
   const pixels = await sharp(buffer)
@@ -250,20 +314,7 @@ async function loadLocalPhotoImage(photo: LocalPhotoForMatch) {
 }
 
 async function fetchFurtrackImage(url: string) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-      Referer: "https://www.furtrack.com/",
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 benfolio-furtrack-match/0.1",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`image fetch returned HTTP ${response.status}`);
-  }
-
-  return Buffer.from(await response.arrayBuffer());
+  return loadFurtrackImageBuffer(url);
 }
 
 async function fingerprintFurtrackCandidate(postId: string) {
@@ -486,10 +537,6 @@ export async function testFurtrackMatchesForEvent(args: {
   const maxPhotos = Math.min(Math.max(args.maxPhotos ?? 80, 1), 200);
   const minScore = args.minScore ?? 0.82;
 
-  if (!tags.length && !explicitPostIds.length) {
-    throw new Error("Provide at least one Furtrack tag or post ID to search.");
-  }
-
   const event = await prisma.event.findUnique({
     where: {
       id: args.eventId,
@@ -498,6 +545,9 @@ export async function testFurtrackMatchesForEvent(args: {
       id: true,
       title: true,
       slug: true,
+      kicker: true,
+      eventDate: true,
+      eventEndDate: true,
       photos: {
         where: {
           processingState: "READY",
@@ -537,8 +587,14 @@ export async function testFurtrackMatchesForEvent(args: {
     throw new Error("Event not found.");
   }
 
+  const candidateTags = tags.length ? tags : buildEventTagSeeds(event);
+
+  if (!candidateTags.length && !explicitPostIds.length) {
+    throw new Error("No Furtrack candidate tags could be derived for this event.");
+  }
+
   const candidatePostIds = await resolveCandidatePostIds({
-    tags,
+    tags: candidateTags,
     postIds: explicitPostIds,
     pagesPerTag: Math.min(Math.max(args.pagesPerTag ?? 1, 1), 5),
     maxCandidates,
@@ -663,7 +719,7 @@ export async function testFurtrackMatchesForEvent(args: {
       slug: event.slug,
     },
     searched: {
-      tags,
+      tags: candidateTags,
       explicitPostIds,
       totalCandidates: candidatePostIds.length,
       localPhotoCount: localPhotos.length,

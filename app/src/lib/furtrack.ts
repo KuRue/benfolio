@@ -1,8 +1,11 @@
 import "server-only";
 
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 
+import { getAppSettingsRecord } from "@/lib/app-settings";
 import { env } from "@/lib/env";
+import { decryptSecret } from "@/lib/secret-box";
 import {
   normalizeTagName,
   normalizeTagSlug,
@@ -78,6 +81,16 @@ export type FurtrackPostDetail = {
 
 type FurtrackFetchOptions = {
   revalidateSeconds?: number;
+};
+
+export type FurtrackRuntimeSettings = {
+  authToken: string | null;
+  baseUrl: string;
+  authTokenSaved: boolean;
+  fetchMode: "auto" | "curl_cffi" | "node";
+  curlCffiCommand: string;
+  curlCffiScript: string;
+  curlCffiImpersonate: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -448,44 +461,242 @@ export function getFurtrackReferenceSummary(reference: string) {
   };
 }
 
-async function fetchFurtrackJson(path: string, options?: FurtrackFetchOptions) {
-  const authToken = env.FURTRACK_AUTH_TOKEN ?? env.FURTRACK_API_KEY;
-  const response = await fetch(`${env.FURTRACK_BASE_URL.replace(/\/$/, "")}${path}`, {
-    headers: {
-      Accept: "application/json, text/plain, */*",
-      "Accept-Language": "en-US,en;q=0.9",
-      Origin: FURTRACK_PUBLIC_BASE_URL,
-      Referer: `${FURTRACK_PUBLIC_BASE_URL}/`,
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 benfolio-furtrack-sync/0.1",
-      ...(authToken
-        ? {
-            Authorization: `Bearer ${authToken}`,
-          }
-        : {}),
-    },
+export async function getFurtrackRuntimeSettings(): Promise<FurtrackRuntimeSettings> {
+  const record = await getAppSettingsRecord();
+  const recordToken = decryptSecret(record?.furtrackAuthToken)?.trim() || null;
+  const envToken = env.FURTRACK_AUTH_TOKEN ?? env.FURTRACK_API_KEY ?? null;
+  const baseUrl =
+    record?.furtrackBaseUrl?.trim() || env.FURTRACK_BASE_URL || "https://solar.furtrack.com";
+  const impersonate =
+    record?.furtrackImpersonate?.trim() || env.FURTRACK_CURL_CFFI_IMPERSONATE;
+
+  return {
+    authToken: recordToken ?? envToken,
+    baseUrl,
+    authTokenSaved: Boolean(recordToken),
+    fetchMode: env.FURTRACK_FETCH_MODE,
+    curlCffiCommand: env.FURTRACK_CURL_CFFI_COMMAND,
+    curlCffiScript: env.FURTRACK_CURL_CFFI_SCRIPT,
+    curlCffiImpersonate: impersonate,
+  };
+}
+
+function furtrackApiHeaders(settings: FurtrackRuntimeSettings) {
+  return {
+    Accept: "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    Origin: FURTRACK_PUBLIC_BASE_URL,
+    Referer: `${FURTRACK_PUBLIC_BASE_URL}/`,
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 benfolio-furtrack-sync/0.1",
+    ...(settings.authToken
+      ? {
+          Authorization: `Bearer ${settings.authToken}`,
+        }
+      : {}),
+  };
+}
+
+function furtrackImageHeaders() {
+  return {
+    Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+    Referer: `${FURTRACK_PUBLIC_BASE_URL}/`,
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 benfolio-furtrack-match/0.1",
+  };
+}
+
+function resolveCurlCffiScript(settings: FurtrackRuntimeSettings) {
+  if (settings.curlCffiScript !== "scripts/furtrack_fetch.py") {
+    return settings.curlCffiScript;
+  }
+
+  return process.cwd().replaceAll("\\", "/").endsWith("/app")
+    ? "../scripts/furtrack_fetch.py"
+    : "scripts/furtrack_fetch.py";
+}
+
+type FurtrackBridgeResponse = {
+  status?: number;
+  bodyText?: string;
+  bodyBase64?: string;
+  error?: string;
+  errorType?: string;
+};
+
+function runCurlCffiRequest(args: {
+  settings: FurtrackRuntimeSettings;
+  url: string;
+  headers: Record<string, string>;
+  responseType: "text" | "base64";
+}): Promise<FurtrackBridgeResponse> {
+  return new Promise((resolve, reject) => {
+    const scriptPath = resolveCurlCffiScript(args.settings);
+    const child = spawn(args.settings.curlCffiCommand, [scriptPath], {
+      cwd: process.cwd(),
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+
+    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.on("error", reject);
+    child.on("close", () => {
+      const text = Buffer.concat(stdout).toString("utf8");
+
+      try {
+        const parsed = JSON.parse(text || "{}") as FurtrackBridgeResponse;
+
+        if (parsed.error) {
+          reject(
+            new Error(
+              `curl_cffi request failed: ${parsed.errorType ?? "Error"} ${parsed.error}`,
+            ),
+          );
+          return;
+        }
+
+        resolve(parsed);
+      } catch (error) {
+        const stderrText = Buffer.concat(stderr).toString("utf8").trim();
+        reject(
+          new Error(
+            stderrText ||
+              (error instanceof Error
+                ? error.message
+                : "curl_cffi helper returned invalid JSON."),
+          ),
+        );
+      }
+    });
+
+    child.stdin.end(
+      JSON.stringify({
+        method: "GET",
+        url: args.url,
+        headers: args.headers,
+        responseType: args.responseType,
+        timeoutSeconds: 35,
+        impersonate: args.settings.curlCffiImpersonate,
+      }),
+    );
+  });
+}
+
+async function fetchWithCurlCffi(args: {
+  settings: FurtrackRuntimeSettings;
+  url: string;
+  headers: Record<string, string>;
+  responseType: "text" | "base64";
+}) {
+  const response = await runCurlCffiRequest(args);
+  const status = response.status ?? 0;
+
+  if (status < 200 || status >= 300) {
+    throwFurtrackStatus(status);
+  }
+
+  if (args.responseType === "base64") {
+    if (!response.bodyBase64) {
+      throw new Error("curl_cffi helper did not return image bytes.");
+    }
+
+    return Buffer.from(response.bodyBase64, "base64");
+  }
+
+  return response.bodyText ?? "";
+}
+
+async function fetchWithNode(args: {
+  url: string;
+  headers: Record<string, string>;
+  responseType: "text" | "base64";
+  options?: FurtrackFetchOptions;
+}) {
+  const response = await fetch(args.url, {
+    headers: args.headers,
     next: {
-      revalidate: options?.revalidateSeconds ?? 60,
+      revalidate: args.options?.revalidateSeconds ?? 60,
     },
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error("Furtrack requires a Bearer JWT token. Set FURTRACK_AUTH_TOKEN or paste raw Furtrack tags.");
-    }
-
-    if (response.status === 403) {
-      throw new Error("Furtrack blocked the server request. Paste raw tags, or run this through a browser-impersonating scraper sidecar.");
-    }
-
-    if (response.status === 429) {
-      throw new Error("Furtrack rate limited the request. Wait and retry.");
-    }
-
-    throw new Error(`Furtrack returned HTTP ${response.status}.`);
+    throwFurtrackStatus(response.status);
   }
 
-  return response.json() as Promise<unknown>;
+  if (args.responseType === "base64") {
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  return response.text();
+}
+
+function throwFurtrackStatus(status: number): never {
+  if (status === 401) {
+    throw new Error(
+      "Furtrack requires a Bearer JWT token. Save one from the Furtrack admin page or set FURTRACK_AUTH_TOKEN.",
+    );
+  }
+
+  if (status === 403) {
+    throw new Error(
+      "Furtrack rejected the request. Use curl_cffi mode with a valid saved Bearer token.",
+    );
+  }
+
+  if (status === 429) {
+    throw new Error("Furtrack rate limited the request. Wait and retry.");
+  }
+
+  throw new Error(`Furtrack returned HTTP ${status}.`);
+}
+
+async function fetchFurtrackResource(args: {
+  url: string;
+  headers: Record<string, string>;
+  responseType: "text" | "base64";
+  options?: FurtrackFetchOptions;
+}) {
+  const settings = await getFurtrackRuntimeSettings();
+
+  if (settings.fetchMode !== "node") {
+    try {
+      return await fetchWithCurlCffi({
+        ...args,
+        settings,
+      });
+    } catch (error) {
+      if (settings.fetchMode === "curl_cffi") {
+        throw error;
+      }
+    }
+  }
+
+  return fetchWithNode(args);
+}
+
+async function fetchFurtrackJson(pathname: string, options?: FurtrackFetchOptions) {
+  const settings = await getFurtrackRuntimeSettings();
+  const text = await fetchFurtrackResource({
+    url: `${settings.baseUrl.replace(/\/$/, "")}${pathname}`,
+    headers: furtrackApiHeaders(settings),
+    responseType: "text",
+    options,
+  });
+
+  return JSON.parse(text.toString()) as unknown;
+}
+
+export async function loadFurtrackImageBuffer(url: string) {
+  const buffer = await fetchFurtrackResource({
+    url,
+    headers: furtrackImageHeaders(),
+    responseType: "base64",
+  });
+
+  return Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
 }
 
 export async function loadFurtrackPost(postId: string): Promise<FurtrackPostDetail> {

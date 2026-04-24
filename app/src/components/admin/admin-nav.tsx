@@ -8,6 +8,7 @@ const navItems = [
   { href: "/admin/events", label: "Events" },
   { href: "/admin/tags", label: "Tags" },
   { href: "/admin/duplicates", label: "Duplicates" },
+  { href: "/admin/furtrack-match-test", label: "Furtrack" },
   { href: "/admin/imports", label: "Imports" },
   { href: "/admin/uploads", label: "Uploads" },
   { href: "/admin/analytics", label: "Analytics" },
