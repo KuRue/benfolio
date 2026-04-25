@@ -112,6 +112,8 @@ type FurtrackMatchPanelProps = {
   furtrackCache: FurtrackCacheSummary;
 };
 
+const AUTO_SYNC_SCORE = 0.9;
+
 function parseList(value: string) {
   return value
     .split(/[\n,]+/)
@@ -136,6 +138,10 @@ function confidenceClass(confidence: VisualMatch["confidence"]) {
 
 function isExactMatch(match: VisualMatch) {
   return match.hammingDistance === 0;
+}
+
+function isAutoSyncMatch(match: VisualMatch) {
+  return match.score >= AUTO_SYNC_SCORE;
 }
 
 function wait(milliseconds: number) {
@@ -231,10 +237,10 @@ export function FurtrackMatchTestPanel({
       ),
     [dismissedKeys, result],
   );
-  const exactCount = visibleSuggestions.filter((suggestion) =>
-    isExactMatch(suggestion.bestMatch),
+  const autoSyncCount = visibleSuggestions.filter((suggestion) =>
+    isAutoSyncMatch(suggestion.bestMatch),
   ).length;
-  const reviewCount = visibleSuggestions.length - exactCount;
+  const reviewCount = visibleSuggestions.length - autoSyncCount;
 
   async function saveSettings(options?: { clearToken?: boolean }) {
     setSettingsPending(true);
@@ -434,26 +440,26 @@ export function FurtrackMatchTestPanel({
     }
   }
 
-  async function syncExactMatches() {
+  async function syncHighConfidenceMatches() {
     if (!eventId) {
       setError("Choose an event first.");
       return;
     }
 
-    const exactSuggestions = visibleSuggestions.filter((suggestion) =>
-      isExactMatch(suggestion.bestMatch),
+    const highConfidenceSuggestions = visibleSuggestions.filter((suggestion) =>
+      isAutoSyncMatch(suggestion.bestMatch),
     );
 
-    if (!exactSuggestions.length) {
-      setError("Run matching first. No exact matches are currently visible.");
+    if (!highConfidenceSuggestions.length) {
+      setError("Run matching first. No 90%+ matches are currently visible.");
       return;
     }
 
     if (
       !window.confirm(
-        `Sync ${exactSuggestions.length} exact visual match${
-          exactSuggestions.length === 1 ? "" : "es"
-        }? Non-exact matches will stay untouched.`,
+        `Sync ${highConfidenceSuggestions.length} visual match${
+          highConfidenceSuggestions.length === 1 ? "" : "es"
+        } at 90% or higher? Lower-confidence matches will stay untouched.`,
       )
     ) {
       return;
@@ -466,7 +472,7 @@ export function FurtrackMatchTestPanel({
     try {
       const failed: string[] = [];
 
-      for (const suggestion of exactSuggestions) {
+      for (const suggestion of highConfidenceSuggestions) {
         const response = await fetch("/api/admin/furtrack/sync-match", {
           method: "POST",
           headers: {
@@ -482,7 +488,7 @@ export function FurtrackMatchTestPanel({
           await readJsonResponse<{
             error?: string;
             message?: string;
-          }>(response, "Unable to sync exact match.");
+          }>(response, "Unable to sync 90%+ match.");
           setDismissedKeys((current) => [
             ...current,
             `${suggestion.localPhoto.id}:${suggestion.bestMatch.postId}`,
@@ -491,16 +497,16 @@ export function FurtrackMatchTestPanel({
           failed.push(
             caughtError instanceof Error
               ? caughtError.message
-              : "Unable to sync exact match.",
+              : "Unable to sync 90%+ match.",
           );
         }
       }
 
       setNotice(
         failed.length
-          ? `Synced ${exactSuggestions.length - failed.length} exact matches. ${failed.length} failed.`
-          : `Synced ${exactSuggestions.length} exact match${
-              exactSuggestions.length === 1 ? "" : "es"
+          ? `Synced ${highConfidenceSuggestions.length - failed.length} 90%+ matches. ${failed.length} failed.`
+          : `Synced ${highConfidenceSuggestions.length} 90%+ match${
+              highConfidenceSuggestions.length === 1 ? "" : "es"
             }.`,
       );
 
@@ -511,7 +517,7 @@ export function FurtrackMatchTestPanel({
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to sync exact matches.",
+          : "Unable to sync 90%+ matches.",
       );
     } finally {
       setSyncPending(false);
@@ -569,7 +575,7 @@ export function FurtrackMatchTestPanel({
               Match and sync tags
             </h1>
             <p className="max-w-3xl text-sm text-white/58">
-              Pick an event. Exact matches can sync automatically; uncertain matches need review.
+              Pick an event. 90%+ matches can sync automatically; lower matches need review.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 text-sm text-white/58">
@@ -611,11 +617,11 @@ export function FurtrackMatchTestPanel({
             </button>
             <button
               type="button"
-              onClick={() => void syncExactMatches()}
-              disabled={syncPending || pending || !eventId || !exactCount}
+              onClick={() => void syncHighConfidenceMatches()}
+              disabled={syncPending || pending || !eventId || !autoSyncCount}
               className="rounded-full border border-[#9588ff]/35 bg-[#9588ff]/14 px-4 py-2 text-sm text-white transition hover:bg-[#9588ff]/20 disabled:opacity-40"
             >
-              {syncPending ? "Syncing..." : "Sync exact matches"}
+              {syncPending ? "Syncing..." : "Sync 90%+ matches"}
             </button>
           </div>
         </div>
@@ -760,7 +766,7 @@ export function FurtrackMatchTestPanel({
             <span className="glass-chip px-4 py-2">
               {result.searched.totalCandidates} Furtrack candidates
             </span>
-            <span className="glass-chip px-4 py-2">{exactCount} exact</span>
+            <span className="glass-chip px-4 py-2">{autoSyncCount} at 90%+</span>
             <span className="glass-chip px-4 py-2">{reviewCount} review</span>
             <span className="glass-chip px-4 py-2">
               searched {result.searched.tags.join(", ") || "specific posts"}
@@ -803,6 +809,7 @@ export function FurtrackMatchTestPanel({
           <div className="space-y-4">
             {visibleSuggestions.map((suggestion) => {
               const exact = isExactMatch(suggestion.bestMatch);
+              const autoSync = isAutoSyncMatch(suggestion.bestMatch);
 
               return (
                 <article
@@ -839,7 +846,11 @@ export function FurtrackMatchTestPanel({
                           <span
                             className={`rounded-full border px-3 py-1 text-xs uppercase tracking-[0.2em] ${confidenceClass(suggestion.bestMatch.confidence)}`}
                           >
-                            {exact ? "EXACT" : suggestion.bestMatch.confidence}
+                            {exact
+                              ? "EXACT"
+                              : autoSync
+                                ? "90%+"
+                                : suggestion.bestMatch.confidence}
                           </span>
                           <span className="glass-chip px-3 py-1 text-xs text-white">
                             {formatPercent(suggestion.bestMatch.score)}
@@ -890,7 +901,7 @@ export function FurtrackMatchTestPanel({
                             disabled={syncPending}
                             className="admin-button-muted"
                           >
-                            {exact ? "Sync" : "Confirm and sync"}
+                            {autoSync ? "Sync" : "Confirm and sync"}
                           </button>
                           <button
                             type="button"

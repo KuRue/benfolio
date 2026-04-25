@@ -14,6 +14,7 @@ const exactSyncSchema = z.object({
   maxCandidates: z.number().int().min(1).max(2000).optional(),
   maxPhotos: z.number().int().min(1).max(500).optional(),
 });
+const AUTO_SYNC_SCORE = 0.9;
 
 export async function POST(request: Request) {
   const admin = await getCurrentAdmin();
@@ -42,10 +43,10 @@ export async function POST(request: Request) {
   try {
     const matchResult = await testFurtrackMatchesForEvent({
       ...parsed.data,
-      minScore: 0.97,
+      minScore: AUTO_SYNC_SCORE,
     });
-    const exactSuggestions = matchResult.suggestions.filter(
-      (suggestion) => suggestion.bestMatch.hammingDistance === 0,
+    const autoSyncSuggestions = matchResult.suggestions.filter(
+      (suggestion) => suggestion.bestMatch.score >= AUTO_SYNC_SCORE,
     );
     const synced: Array<{
       photoId: string;
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
       error: string;
     }> = [];
 
-    for (const suggestion of exactSuggestions) {
+    for (const suggestion of autoSyncSuggestions) {
       try {
         const imported = await importFurtrackTagsForPhoto({
           photoId: suggestion.localPhoto.id,
@@ -97,14 +98,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message:
         synced.length === 1
-          ? "Synced Furtrack tags for 1 exact match."
-          : `Synced Furtrack tags for ${synced.length} exact matches.`,
+          ? "Synced Furtrack tags for 1 90%+ match."
+          : `Synced Furtrack tags for ${synced.length} 90%+ matches.`,
       result: {
         event: matchResult.event,
-        exactMatchCount: exactSuggestions.length,
+        exactMatchCount: autoSyncSuggestions.length,
         synced,
         failed,
-        skippedCount: matchResult.suggestions.length - exactSuggestions.length,
+        skippedCount: matchResult.suggestions.length - autoSyncSuggestions.length,
         candidateErrors: matchResult.errors,
       },
     });
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
         error:
           error instanceof Error
             ? error.message
-            : "Unable to sync Furtrack exact matches.",
+            : "Unable to sync Furtrack 90%+ matches.",
       },
       { status: 500 },
     );

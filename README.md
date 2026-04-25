@@ -334,7 +334,7 @@ The matcher:
 - computes a simple perceptual difference hash for each image
 - ranks candidates by visual similarity and aspect-ratio fit
 - shows local and Furtrack photos side-by-side for review
-- can sync one confirmed match or all exact `100%` visual-hash matches
+- can sync one confirmed match or all `90%+` visual matches
 
 The **Sync Furtrack cache** action queues a worker job that walks the full selected tag
 feed until Furtrack returns no more posts, then fetches each post's tags and image
@@ -344,10 +344,9 @@ same Furtrack posts for every event. Re-run it as maintenance when old Furtrack 
 receive new tags. The worker keeps an internal high safety ceiling to avoid runaway jobs,
 but the admin UI does not require guessing page or candidate counts.
 
-The **Sync exact matches** action uses the exact matches currently shown, then imports
-Furtrack tags and creates Furtrack external links for those photos.
-It intentionally skips non-exact matches so the first writable version stays conservative.
-Near matches must be confirmed individually before they write tags.
+The **Sync 90%+ matches** action uses the high-confidence matches currently shown, then
+imports Furtrack tags and creates Furtrack external links for those photos. It intentionally
+skips lower-confidence matches so uncertain pairs still require manual confirmation.
 
 ### Direct browser uploads (required for admin upload to work)
 
