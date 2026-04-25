@@ -47,6 +47,44 @@ export function getTagCategoryLabel(category: TagCategoryValue) {
   );
 }
 
+const tagCategorySearchAliases: Record<string, TagCategoryValue> = {
+  character: "CHARACTER",
+  characters: "CHARACTER",
+  char: "CHARACTER",
+  event: "EVENT",
+  events: "EVENT",
+  species: "SPECIES",
+  maker: "MAKER",
+  makers: "MAKER",
+  general: "GENERAL",
+  tag: "GENERAL",
+  tags: "GENERAL",
+};
+
+export function resolveTagSearchCategoryPrefix(value: string) {
+  const normalized = normalizeTagName(value).toLowerCase();
+
+  if (normalized in tagCategorySearchAliases) {
+    return tagCategorySearchAliases[normalized];
+  }
+
+  const directMatch = tagCategoryOptions.find(
+    (option) => option.value.toLowerCase() === normalized,
+  );
+
+  return directMatch?.value ?? null;
+}
+
+export function buildTagSearchQuery(tag: {
+  name: string;
+  category: TagCategoryValue;
+}) {
+  const prefix = getTagCategoryLabel(tag.category);
+  const name = normalizeTagName(tag.name).replace(/"/g, "'");
+
+  return /\s|:/.test(name) ? `${prefix}:"${name}"` : `${prefix}:${name}`;
+}
+
 export function orderTagCategories(categories: TagCategoryValue[]) {
   return [...categories].sort(
     (left, right) =>

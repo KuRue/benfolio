@@ -49,7 +49,7 @@ export function PublicSearchInput({ initialQuery }: PublicSearchInputProps) {
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search by character, event, year, species, maker, or general tag"
+        placeholder='Search photos, or use Maker:"Name"'
         className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/34 sm:text-lg"
         autoComplete="off"
         autoFocus={!initialQuery}

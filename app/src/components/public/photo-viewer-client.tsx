@@ -13,7 +13,10 @@ import {
 } from "react";
 
 import { ArrowLeft, ArrowRight, Download, Info, Link2, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+import { buildTagSearchQuery, type TagCategoryValue } from "@/lib/tags";
 
 type ViewerInfoRow = {
   label: string;
@@ -21,7 +24,7 @@ type ViewerInfoRow = {
 };
 
 type ViewerTagGroup = {
-  category: string;
+  category: TagCategoryValue;
   label: string;
   tags: Array<{
     name: string;
@@ -247,12 +250,19 @@ function DetailsPanel({
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {group.tags.map((tag) => (
-                    <span
+                    <Link
                       key={`${group.category}:${tag.slug ?? tag.name}`}
-                      className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-xs text-white/74"
+                      href={`/search?query=${encodeURIComponent(
+                        buildTagSearchQuery({
+                          category: group.category,
+                          name: tag.name,
+                        }),
+                      )}`}
+                      className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-xs text-white/74 transition hover:border-[#8f73ff]/42 hover:bg-[#6f5cff]/16 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8f73ff]/45"
+                      aria-label={`Search ${group.label}: ${tag.name}`}
                     >
                       {tag.name}
-                    </span>
+                    </Link>
                   ))}
                 </div>
               </div>

@@ -102,8 +102,8 @@ export default async function PublicSearchPage({
           </div>
         ) : !query ? (
           <div className="solid-panel px-6 py-12 text-center text-sm text-white/56">
-            Type a query above to search by character, event, year, species,
-            maker, or general tag.
+            Type a query above, or narrow by category with{" "}
+            <span className="text-white/76">Maker:&quot;Name&quot;</span>.
           </div>
         ) : !results.length ? (
           <div className="solid-panel px-6 py-12 text-center text-sm text-white/56">

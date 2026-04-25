@@ -302,7 +302,7 @@ export function PublicPhotoSearchLauncher({
                     }
                   }}
                   className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/34 sm:text-lg"
-                  placeholder="Search by character, event, year, species, maker, or general tag"
+                  placeholder='Search photos, or use Maker:"Name"'
                 />
                 <button
                   type="button"

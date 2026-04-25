@@ -7,7 +7,13 @@ import { getEffectiveTakenAt } from "@/lib/photo-order";
 import { prisma } from "@/lib/prisma";
 import { formatDateRange, formatShortDate } from "@/lib/strings";
 import { buildDisplayUrl } from "@/lib/storage";
-import { getTagCategoryLabel, normalizeTagName, type TagCategoryValue } from "@/lib/tags";
+import {
+  getTagCategoryLabel,
+  normalizeTagName,
+  normalizeTagSlug,
+  resolveTagSearchCategoryPrefix,
+  type TagCategoryValue,
+} from "@/lib/tags";
 
 const DEFAULT_RESULT_LIMIT = 12;
 // Bumped from 18 to accommodate the dedicated /search results page,
@@ -59,6 +65,18 @@ type SearchResultTag = {
   category: TagCategoryValue;
 };
 
+type ParsedTagFilter = {
+  category: TagCategoryValue;
+  value: string;
+  normalizedValue: string;
+  slugValue: string;
+};
+
+type ParsedSearchQuery = {
+  terms: string[];
+  tagFilters: ParsedTagFilter[];
+};
+
 export type PublicPhotoSearchResult = {
   id: string;
   href: string;
@@ -105,6 +123,35 @@ function tokenizeSearchQuery(query: string) {
       .map((term) => term.trim())
       .filter(Boolean),
   )].slice(0, MAX_QUERY_TERMS);
+}
+
+function parseSearchQuery(query: string): ParsedSearchQuery {
+  const tagFilters: ParsedTagFilter[] = [];
+  const remainingQuery = query.replace(
+    /(^|\s)([a-zA-Z]+):(?:"([^"]+)"|'([^']+)'|([^\s]+))/g,
+    (match, leading: string, prefix: string, quotedValue?: string, singleQuotedValue?: string, bareValue?: string) => {
+      const category = resolveTagSearchCategoryPrefix(prefix);
+      const value = normalizeTagName(quotedValue ?? singleQuotedValue ?? bareValue ?? "");
+
+      if (!category || !value) {
+        return match;
+      }
+
+      tagFilters.push({
+        category,
+        value,
+        normalizedValue: value.toLowerCase(),
+        slugValue: normalizeTagSlug(value).toLowerCase(),
+      });
+
+      return leading;
+    },
+  );
+
+  return {
+    terms: tokenizeSearchQuery(remainingQuery),
+    tagFilters: tagFilters.slice(0, MAX_QUERY_TERMS),
+  };
 }
 
 function buildYearClauses(term: string): Prisma.PhotoWhereInput[] {
@@ -158,7 +205,54 @@ function buildYearClauses(term: string): Prisma.PhotoWhereInput[] {
   ];
 }
 
-function buildPublicPhotoSearchWhere(terms: string[]) {
+function buildTagFilterClause(filter: ParsedTagFilter): Prisma.PhotoWhereInput {
+  return {
+    tags: {
+      some: {
+        tag: {
+          category: filter.category,
+          OR: [
+            {
+              name: {
+                contains: filter.value,
+                mode: "insensitive",
+              },
+            },
+            {
+              slug: {
+                contains: filter.slugValue,
+                mode: "insensitive",
+              },
+            },
+            {
+              aliases: {
+                some: {
+                  OR: [
+                    {
+                      name: {
+                        contains: filter.value,
+                        mode: "insensitive",
+                      },
+                    },
+                    {
+                      slug: {
+                        contains: filter.slugValue,
+                        mode: "insensitive",
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+}
+
+function buildPublicPhotoSearchWhere(parsedQuery: ParsedSearchQuery) {
+  const { terms, tagFilters } = parsedQuery;
   const andClauses: Prisma.PhotoWhereInput[] = terms.map((term) => ({
     OR: [
       {
@@ -257,7 +351,9 @@ function buildPublicPhotoSearchWhere(terms: string[]) {
         visibility: "PUBLIC",
       },
     },
-    ...(andClauses.length ? { AND: andClauses } : {}),
+    ...(andClauses.length || tagFilters.length
+      ? { AND: [...andClauses, ...tagFilters.map(buildTagFilterClause)] }
+      : {}),
   } satisfies Prisma.PhotoWhereInput;
 }
 
@@ -281,7 +377,35 @@ function equalsNormalized(value: string | null | undefined, term: string) {
   return normalizeTagName(value).toLowerCase() === term;
 }
 
-function getMatchedTags(candidate: SearchCandidate, terms: string[]) {
+function tagMatchesFilter(
+  tag: SearchCandidate["tags"][number]["tag"],
+  filter: ParsedTagFilter,
+) {
+  if (tag.category !== filter.category) {
+    return false;
+  }
+
+  if (
+    tag.slug.toLowerCase() === filter.slugValue ||
+    equalsNormalized(tag.name, filter.normalizedValue) ||
+    includesNormalized(tag.slug, filter.slugValue) ||
+    includesNormalized(tag.name, filter.normalizedValue)
+  ) {
+    return true;
+  }
+
+  return tag.aliases.some(
+    (alias) =>
+      alias.slug.toLowerCase() === filter.slugValue ||
+      equalsNormalized(alias.name, filter.normalizedValue) ||
+      includesNormalized(alias.slug, filter.slugValue) ||
+      includesNormalized(alias.name, filter.normalizedValue),
+  );
+}
+
+function getMatchedTags(candidate: SearchCandidate, parsedQuery: ParsedSearchQuery) {
+  const { terms, tagFilters } = parsedQuery;
+
   return candidate.tags
     .map((photoTag) => photoTag.tag)
     .filter((tag) =>
@@ -296,7 +420,7 @@ function getMatchedTags(candidate: SearchCandidate, terms: string[]) {
               includesNormalized(alias.slug, term) ||
               includesNormalized(alias.name, term),
           ),
-      ),
+      ) || tagFilters.some((filter) => tagMatchesFilter(tag, filter)),
     )
     .slice(0, 4);
 }
@@ -335,13 +459,53 @@ function candidateHasPartialTagMatch(candidate: SearchCandidate, term: string) {
   });
 }
 
-function scoreCandidate(candidate: SearchCandidate, terms: string[]) {
+function candidateHasExactFilteredTagMatch(
+  candidate: SearchCandidate,
+  filter: ParsedTagFilter,
+) {
+  return candidate.tags.some(({ tag }) => {
+    if (tag.category !== filter.category) {
+      return false;
+    }
+
+    if (
+      tag.slug.toLowerCase() === filter.slugValue ||
+      equalsNormalized(tag.name, filter.normalizedValue)
+    ) {
+      return true;
+    }
+
+    return tag.aliases.some(
+      (alias) =>
+        alias.slug.toLowerCase() === filter.slugValue ||
+        equalsNormalized(alias.name, filter.normalizedValue),
+    );
+  });
+}
+
+function candidateHasPartialFilteredTagMatch(
+  candidate: SearchCandidate,
+  filter: ParsedTagFilter,
+) {
+  return candidate.tags.some(({ tag }) => tagMatchesFilter(tag, filter));
+}
+
+function scoreCandidate(candidate: SearchCandidate, parsedQuery: ParsedSearchQuery) {
+  const { terms, tagFilters } = parsedQuery;
   const eventYear = getDateYear(candidate.event.eventDate);
   const eventEndYear = getDateYear(candidate.event.eventEndDate);
   const effectiveTakenAt = getEffectiveTakenAt(candidate);
   const effectiveYear = getDateYear(effectiveTakenAt);
-  const matchedTags = getMatchedTags(candidate, terms);
+  const matchedTags = getMatchedTags(candidate, parsedQuery);
   let total = 0;
+
+  for (const filter of tagFilters) {
+    if (candidateHasExactFilteredTagMatch(candidate, filter)) {
+      total += 150;
+    } else if (candidateHasPartialFilteredTagMatch(candidate, filter)) {
+      total += 116;
+    }
+  }
 
   for (const term of terms) {
     let bestScore = 0;
@@ -393,10 +557,13 @@ function scoreCandidate(candidate: SearchCandidate, terms: string[]) {
   return total;
 }
 
-function toSearchResult(candidate: SearchCandidate, terms: string[]): PublicPhotoSearchResult {
+function toSearchResult(
+  candidate: SearchCandidate,
+  parsedQuery: ParsedSearchQuery,
+): PublicPhotoSearchResult {
   const preview = pickDerivative(candidate.derivatives, ["THUMBNAIL", "GRID", "VIEWER"]);
   const effectiveTakenAt = getEffectiveTakenAt(candidate);
-  const matchedTags = getMatchedTags(candidate, terms);
+  const matchedTags = getMatchedTags(candidate, parsedQuery);
 
   return {
     id: candidate.id,
@@ -431,15 +598,18 @@ function toSearchResult(candidate: SearchCandidate, terms: string[]): PublicPhot
 
 export async function searchPublicPhotos(args: { query: string; limit?: number }) {
   const runtimeSettings = await getResolvedRuntimeSettings();
-  const terms = tokenizeSearchQuery(args.query);
+  const parsedQuery = parseSearchQuery(args.query);
 
-  if (!runtimeSettings.publicSearchEnabled || !terms.length) {
+  if (
+    !runtimeSettings.publicSearchEnabled ||
+    (!parsedQuery.terms.length && !parsedQuery.tagFilters.length)
+  ) {
     return [];
   }
 
   const limit = Math.min(Math.max(args.limit ?? DEFAULT_RESULT_LIMIT, 1), MAX_RESULT_LIMIT);
   const candidates = await prisma.photo.findMany({
-    where: buildPublicPhotoSearchWhere(terms),
+    where: buildPublicPhotoSearchWhere(parsedQuery),
     take: Math.min(limit * 8, 120),
     orderBy: [{ createdAt: "desc" }],
     include: {
@@ -474,7 +644,7 @@ export async function searchPublicPhotos(args: { query: string; limit?: number }
   return candidates
     .map((candidate) => ({
       candidate,
-      score: scoreCandidate(candidate, terms),
+      score: scoreCandidate(candidate, parsedQuery),
       effectiveTakenAt: getEffectiveTakenAt(candidate),
     }))
     .sort((left, right) => {
@@ -489,5 +659,5 @@ export async function searchPublicPhotos(args: { query: string; limit?: number }
       return rightTime - leftTime;
     })
     .slice(0, limit)
-    .map(({ candidate }) => toSearchResult(candidate, terms));
+    .map(({ candidate }) => toSearchResult(candidate, parsedQuery));
 }
