@@ -2,10 +2,12 @@ import "server-only";
 
 import sharp from "sharp";
 
+import { Prisma } from "../../../prisma/generated/client/client";
 import {
   loadFurtrackImageBuffer,
   loadFurtrackPost,
   loadFurtrackPostIdsByTag,
+  loadFurtrackPostIdsByTagPage,
   type FurtrackPostDetail,
 } from "@/lib/furtrack";
 import { prisma } from "@/lib/prisma";
@@ -149,6 +151,72 @@ export type FurtrackEventMatchTestResult = {
     bestScore: number | null;
   }>;
   errors: CandidateError[];
+};
+
+type FurtrackMatchRunStage = "discover" | "local" | "candidates" | "finalize" | "complete";
+
+type SerializedLocalPhotoRef = LocalPhotoForMatch;
+
+type SerializedLocalPhoto = {
+  photo: SerializedLocalPhotoRef;
+  previewUrl: string | null;
+  fingerprint: ImageFingerprint;
+};
+
+type SerializedCandidate = {
+  post: FurtrackPostForMatch;
+  fingerprint: ImageFingerprint;
+};
+
+type FurtrackPostForMatch = Pick<
+  FurtrackPostDetail,
+  "post" | "tags" | "externalUrl" | "imageUrl"
+>;
+
+type FurtrackMatchRunPayload = {
+  kind: "furtrack-match-run";
+  version: 1;
+  stage: FurtrackMatchRunStage;
+  event: {
+    id: string;
+    title: string;
+    slug: string;
+  };
+  request: {
+    eventId: string;
+    tags: string[];
+    explicitPostIds: string[];
+    candidateTags: string[];
+    pagesPerTag: number;
+    maxCandidates: number;
+    maxPhotos: number;
+    minScore: number;
+  };
+  progress: {
+    current: number;
+    total: number;
+    label: string;
+  };
+  discovery: {
+    tagIndex: number;
+    page: number;
+    candidateIndex: number;
+    postIds: string[];
+  };
+  localRefs: SerializedLocalPhotoRef[];
+  locals: SerializedLocalPhoto[];
+  candidates: SerializedCandidate[];
+  errors: CandidateError[];
+  result?: FurtrackEventMatchTestResult;
+};
+
+export type FurtrackMatchRunSummary = {
+  id: string;
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  errorMessage: string | null;
+  stage: FurtrackMatchRunStage | null;
+  progress: FurtrackMatchRunPayload["progress"] | null;
+  result: FurtrackEventMatchTestResult | null;
 };
 
 function pickLocalDerivative(derivatives: LocalPhotoForMatch["derivatives"]) {
@@ -393,7 +461,7 @@ async function resolveCandidatePostIds(args: {
 
 function toMatch(args: {
   localFingerprint: ImageFingerprint;
-  post: FurtrackPostDetail;
+  post: FurtrackPostForMatch;
   candidateFingerprint: ImageFingerprint;
 }) {
   const hamming = hammingDistance(
@@ -771,4 +839,477 @@ export async function testFurtrackMatchesForEvent(args: {
     unmatchedPhotos,
     errors,
   };
+}
+
+function toInputJson(value: unknown) {
+  return value as Prisma.InputJsonValue;
+}
+
+function asMatchRunPayload(value: unknown): FurtrackMatchRunPayload | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const candidate = value as Partial<FurtrackMatchRunPayload>;
+  if (candidate.kind !== "furtrack-match-run" || candidate.version !== 1) {
+    return null;
+  }
+
+  const payload = candidate as FurtrackMatchRunPayload;
+
+  if (typeof payload.discovery.candidateIndex !== "number") {
+    payload.discovery.candidateIndex = 0;
+  }
+
+  return payload;
+}
+
+function summarizeRun(payload: FurtrackMatchRunPayload, job: {
+  id: string;
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  errorMessage: string | null;
+}): FurtrackMatchRunSummary {
+  return {
+    id: job.id,
+    status: job.status,
+    errorMessage: job.errorMessage,
+    stage: payload.stage,
+    progress: payload.progress,
+    result: payload.result ?? null,
+  };
+}
+
+async function loadRun(jobId: string) {
+  const job = await prisma.importJob.findUnique({
+    where: { id: jobId },
+    select: {
+      id: true,
+      status: true,
+      errorMessage: true,
+      payloadJson: true,
+    },
+  });
+
+  if (!job) {
+    throw new Error("Furtrack match run not found.");
+  }
+
+  const payload = asMatchRunPayload(job.payloadJson);
+
+  if (!payload) {
+    throw new Error("Import job is not a Furtrack match run.");
+  }
+
+  return {
+    job,
+    payload,
+  };
+}
+
+async function saveRunPayload(jobId: string, payload: FurtrackMatchRunPayload) {
+  const status =
+    payload.stage === "complete"
+      ? "SUCCEEDED"
+      : payload.errors.length && !payload.discovery.postIds.length && payload.stage === "local"
+        ? "FAILED"
+        : "RUNNING";
+
+  const updated = await prisma.importJob.update({
+    where: { id: jobId },
+    data: {
+      status,
+      payloadJson: toInputJson(payload),
+      processedItems: payload.progress.current,
+      totalItems: payload.progress.total,
+      startedAt: new Date(),
+      finishedAt: payload.stage === "complete" ? new Date() : null,
+      errorMessage:
+        status === "FAILED"
+          ? payload.errors.map((error) => error.error).slice(0, 4).join("\n")
+          : null,
+    },
+    select: {
+      id: true,
+      status: true,
+      errorMessage: true,
+    },
+  });
+
+  return summarizeRun(payload, updated);
+}
+
+function buildEventMatchResultFromPayload(
+  payload: FurtrackMatchRunPayload,
+): FurtrackEventMatchTestResult {
+  const perPhotoMatches = payload.locals.map((localPhoto) => {
+    const matches = payload.candidates
+      .map((candidate) =>
+        toMatch({
+          localFingerprint: localPhoto.fingerprint,
+          post: candidate.post,
+          candidateFingerprint: candidate.fingerprint,
+        }),
+      )
+      .sort((left, right) => right.score - left.score);
+
+    return {
+      localPhoto,
+      matches,
+    };
+  });
+  const allPairs = perPhotoMatches
+    .flatMap((entry) =>
+      entry.matches.map((match) => ({
+        localPhoto: entry.localPhoto,
+        match,
+      })),
+    )
+    .sort((left, right) => right.match.score - left.match.score);
+  const usedPhotoIds = new Set<string>();
+  const usedPostIds = new Set<string>();
+  const suggestions: FurtrackEventMatchSuggestion[] = [];
+
+  for (const pair of allPairs) {
+    if (pair.match.score < payload.request.minScore) {
+      break;
+    }
+
+    if (
+      usedPhotoIds.has(pair.localPhoto.photo.id) ||
+      usedPostIds.has(pair.match.postId)
+    ) {
+      continue;
+    }
+
+    usedPhotoIds.add(pair.localPhoto.photo.id);
+    usedPostIds.add(pair.match.postId);
+
+    suggestions.push({
+      localPhoto: {
+        id: pair.localPhoto.photo.id,
+        originalFilename: pair.localPhoto.photo.originalFilename,
+        previewUrl: pair.localPhoto.previewUrl,
+        event: pair.localPhoto.photo.event,
+        hash: pair.localPhoto.fingerprint.hash,
+        dimensions: {
+          width: pair.localPhoto.fingerprint.width ?? pair.localPhoto.photo.width,
+          height: pair.localPhoto.fingerprint.height ?? pair.localPhoto.photo.height,
+        },
+      },
+      bestMatch: pair.match,
+      alternatives:
+        perPhotoMatches
+          .find((entry) => entry.localPhoto.photo.id === pair.localPhoto.photo.id)
+          ?.matches.filter((match) => match.postId !== pair.match.postId)
+          .slice(0, 3) ?? [],
+    });
+  }
+
+  return {
+    event: payload.event,
+    searched: {
+      tags: payload.request.candidateTags,
+      explicitPostIds: payload.request.explicitPostIds,
+      totalCandidates: payload.candidates.length,
+      localPhotoCount: payload.locals.length,
+    },
+    suggestions,
+    unmatchedPhotos: perPhotoMatches
+      .filter((entry) => !usedPhotoIds.has(entry.localPhoto.photo.id))
+      .map((entry) => ({
+        id: entry.localPhoto.photo.id,
+        originalFilename: entry.localPhoto.photo.originalFilename,
+        previewUrl: entry.localPhoto.previewUrl,
+        bestScore: entry.matches[0]?.score ?? null,
+      })),
+    errors: payload.errors,
+  };
+}
+
+export async function createFurtrackMatchRun(args: {
+  eventId: string;
+  tags?: string[];
+  postIds?: string[];
+  pagesPerTag?: number;
+  maxCandidates?: number;
+  maxPhotos?: number;
+  minScore?: number;
+  requestedById?: string;
+}) {
+  const tags = [...new Set((args.tags ?? []).map((tag) => tag.trim()).filter(Boolean))];
+  const explicitPostIds = [
+    ...new Set((args.postIds ?? []).map((postId) => postId.trim()).filter(Boolean)),
+  ];
+  const maxCandidates = Math.min(Math.max(args.maxCandidates ?? 800, 1), 2000);
+  const maxPhotos = Math.min(Math.max(args.maxPhotos ?? 250, 1), 500);
+  const pagesPerTag = Math.min(Math.max(args.pagesPerTag ?? 5, 1), 10);
+  const minScore = args.minScore ?? 0.74;
+  const event = await prisma.event.findUnique({
+    where: {
+      id: args.eventId,
+    },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      kicker: true,
+      eventDate: true,
+      eventEndDate: true,
+      photos: {
+        where: {
+          processingState: "READY",
+        },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        take: maxPhotos,
+        select: {
+          id: true,
+          originalFilename: true,
+          originalKey: true,
+          width: true,
+          height: true,
+          event: {
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+            },
+          },
+          derivatives: {
+            orderBy: {
+              width: "desc",
+            },
+            select: {
+              kind: true,
+              width: true,
+              height: true,
+              storageKey: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!event) {
+    throw new Error("Event not found.");
+  }
+
+  const candidateTags = tags.length ? tags : buildEventTagSeeds(event);
+
+  if (!candidateTags.length && !explicitPostIds.length) {
+    throw new Error("No Furtrack candidate tags could be derived for this event.");
+  }
+
+  const initialCandidateTotal = candidateTags.length
+    ? maxCandidates
+    : explicitPostIds.length;
+  const payload: FurtrackMatchRunPayload = {
+    kind: "furtrack-match-run",
+    version: 1,
+    stage: candidateTags.length ? "discover" : "local",
+    event: {
+      id: event.id,
+      title: event.title,
+      slug: event.slug,
+    },
+    request: {
+      eventId: event.id,
+      tags,
+      explicitPostIds,
+      candidateTags,
+      pagesPerTag,
+      maxCandidates,
+      maxPhotos,
+      minScore,
+    },
+    progress: {
+      current: 0,
+      total:
+        candidateTags.length * pagesPerTag +
+        event.photos.length +
+        initialCandidateTotal,
+      label: "Starting",
+    },
+    discovery: {
+      tagIndex: 0,
+      page: 0,
+      candidateIndex: 0,
+      postIds: explicitPostIds,
+    },
+    localRefs: event.photos,
+    locals: [],
+    candidates: [],
+    errors: [],
+  };
+  const job = await prisma.importJob.create({
+    data: {
+      type: "FURTRACK_SYNC",
+      source: "FURTRACK",
+      status: "PENDING",
+      eventId: event.id,
+      requestedById: args.requestedById,
+      payloadJson: toInputJson(payload),
+      totalItems: payload.progress.total,
+    },
+    select: {
+      id: true,
+      status: true,
+      errorMessage: true,
+    },
+  });
+
+  return summarizeRun(payload, job);
+}
+
+export async function getFurtrackMatchRun(jobId: string) {
+  const { job, payload } = await loadRun(jobId);
+  return summarizeRun(payload, job);
+}
+
+const LOCAL_CHUNK_SIZE = 8;
+const CANDIDATE_CHUNK_SIZE = 1;
+
+export async function stepFurtrackMatchRun(jobId: string) {
+  const { payload } = await loadRun(jobId);
+
+  if (payload.stage === "complete") {
+    return saveRunPayload(jobId, payload);
+  }
+
+  if (payload.stage === "discover") {
+    const tag = payload.request.candidateTags[payload.discovery.tagIndex];
+
+    if (!tag || payload.discovery.postIds.length >= payload.request.maxCandidates) {
+      payload.stage = "local";
+      payload.progress = {
+        current: payload.progress.current,
+        total:
+          payload.progress.current +
+          payload.localRefs.length +
+          Math.min(payload.discovery.postIds.length, payload.request.maxCandidates),
+        label: "Preparing local photos",
+      };
+      return saveRunPayload(jobId, payload);
+    }
+
+    try {
+      const pagePostIds = await loadFurtrackPostIdsByTagPage({
+        tag,
+        page: payload.discovery.page,
+        maxPosts: payload.request.maxCandidates - payload.discovery.postIds.length,
+      });
+
+      for (const postId of pagePostIds) {
+        if (!payload.discovery.postIds.includes(postId)) {
+          payload.discovery.postIds.push(postId);
+        }
+      }
+    } catch (error) {
+      payload.errors.push({
+        postId: `tag:${tag}:${payload.discovery.page}`,
+        error: error instanceof Error ? error.message : "Candidate page failed.",
+      });
+    }
+
+    payload.discovery.page += 1;
+    payload.progress = {
+      current: payload.progress.current + 1,
+      total: payload.progress.total,
+      label: `Scanning Furtrack ${tag} page ${payload.discovery.page}`,
+    };
+
+    if (payload.discovery.page >= payload.request.pagesPerTag) {
+      payload.discovery.page = 0;
+      payload.discovery.tagIndex += 1;
+    }
+
+    return saveRunPayload(jobId, payload);
+  }
+
+  if (payload.stage === "local") {
+    const start = payload.locals.length;
+    const next = payload.localRefs.slice(start, start + LOCAL_CHUNK_SIZE);
+
+    for (const photo of next) {
+      try {
+        const { buffer, previewUrl } = await loadLocalPhotoImage(photo);
+        payload.locals.push({
+          photo,
+          previewUrl,
+          fingerprint: await fingerprintImage(buffer),
+        });
+      } catch (error) {
+        payload.errors.push({
+          postId: `local:${photo.id}`,
+          error: error instanceof Error ? error.message : "Local photo failed.",
+        });
+      }
+    }
+
+    payload.progress = {
+      current: payload.progress.current + next.length,
+      total: payload.progress.total,
+      label: `Prepared ${payload.locals.length}/${payload.localRefs.length} local photos`,
+    };
+
+    if (payload.locals.length >= payload.localRefs.length) {
+      payload.discovery.postIds = payload.discovery.postIds.slice(
+        0,
+        payload.request.maxCandidates,
+      );
+      payload.stage = "candidates";
+    }
+
+    return saveRunPayload(jobId, payload);
+  }
+
+  if (payload.stage === "candidates") {
+    const start = payload.discovery.candidateIndex;
+    const next = payload.discovery.postIds.slice(start, start + CANDIDATE_CHUNK_SIZE);
+
+    for (const postId of next) {
+      try {
+        const post = await loadFurtrackPost(postId);
+        const candidateBuffer = await loadFurtrackImageBuffer(post.imageUrl);
+        payload.candidates.push({
+          post: {
+            post: post.post,
+            tags: post.tags,
+            externalUrl: post.externalUrl,
+            imageUrl: post.imageUrl,
+          },
+          fingerprint: await fingerprintImage(candidateBuffer),
+        });
+      } catch (error) {
+        payload.errors.push({
+          postId,
+          error: error instanceof Error ? error.message : "Candidate failed.",
+        });
+      }
+    }
+
+    payload.discovery.candidateIndex += next.length;
+
+    payload.progress = {
+      current: payload.progress.current + next.length,
+      total: payload.progress.total,
+      label: `Checked ${payload.discovery.candidateIndex}/${payload.discovery.postIds.length} Furtrack candidates`,
+    };
+
+    if (payload.discovery.candidateIndex >= payload.discovery.postIds.length) {
+      payload.stage = "finalize";
+    }
+
+    return saveRunPayload(jobId, payload);
+  }
+
+  payload.result = buildEventMatchResultFromPayload(payload);
+  payload.stage = "complete";
+  payload.progress = {
+    current: payload.progress.total,
+    total: payload.progress.total,
+    label: "Complete",
+  };
+
+  return saveRunPayload(jobId, payload);
 }

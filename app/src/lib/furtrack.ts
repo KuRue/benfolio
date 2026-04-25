@@ -826,6 +826,38 @@ export async function loadFurtrackPostIdsByTag(args: {
   return postIds;
 }
 
+export async function loadFurtrackPostIdsByTagPage(args: {
+  tag: string;
+  page: number;
+  maxPosts?: number;
+}) {
+  const page = Math.max(args.page, 0);
+  const maxPosts = Math.min(Math.max(args.maxPosts ?? 200, 1), 200);
+  const path =
+    page === 0
+      ? `/view/index/${encodeURIComponent(args.tag)}`
+      : `/view/index/${encodeURIComponent(args.tag)}/${page}`;
+  const payload = await fetchFurtrackJson(path);
+  const posts = isRecord(payload) && Array.isArray(payload.posts) ? payload.posts : [];
+  const postIds: string[] = [];
+
+  for (const post of posts) {
+    const postId = isRecord(post)
+      ? compactString(post.postId) || compactString(post.id)
+      : compactString(post);
+
+    if (postId && !postIds.includes(postId)) {
+      postIds.push(postId);
+    }
+
+    if (postIds.length >= maxPosts) {
+      break;
+    }
+  }
+
+  return postIds;
+}
+
 export async function loadFurtrackImportPayload(
   reference: string,
 ): Promise<FurtrackImportPayload> {

@@ -68,6 +68,19 @@ type EventMatchResult = {
   }>;
 };
 
+type FurtrackMatchRun = {
+  id: string;
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  errorMessage: string | null;
+  stage: "discover" | "local" | "candidates" | "finalize" | "complete" | null;
+  progress: {
+    current: number;
+    total: number;
+    label: string;
+  } | null;
+  result: EventMatchResult | null;
+};
+
 type FurtrackMatchPanelProps = {
   events: AdminEventOption[];
   furtrackSettings: FurtrackSettings;
@@ -97,6 +110,24 @@ function confidenceClass(confidence: VisualMatch["confidence"]) {
 
 function isExactMatch(match: VisualMatch) {
   return match.hammingDistance === 0;
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
+
+function formatRunProgress(run: FurtrackMatchRun) {
+  if (!run.progress) {
+    return "Starting Furtrack match run.";
+  }
+
+  const percent = run.progress.total
+    ? Math.min(100, Math.round((run.progress.current / run.progress.total) * 100))
+    : 0;
+
+  return `${run.progress.label} · ${percent}%`;
 }
 
 async function readJsonResponse<T extends { error?: string }>(
@@ -161,6 +192,7 @@ export function FurtrackMatchTestPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<EventMatchResult | null>(null);
+  const [matchRun, setMatchRun] = useState<FurtrackMatchRun | null>(null);
   const [dismissedKeys, setDismissedKeys] = useState<string[]>([]);
 
   const selectedEvent = events.find((event) => event.id === eventId);
@@ -240,35 +272,77 @@ export function FurtrackMatchTestPanel({
     setError(null);
     setNotice(null);
     setDismissedKeys([]);
+    setResult(null);
+    setMatchRun(null);
 
     try {
-      const response = await fetch("/api/admin/furtrack/match-test", {
+      const requestPayload = {
+        eventId,
+        tags: parseList(candidateTags),
+        postIds: parseList(postIds),
+        maxCandidates,
+        maxPhotos,
+        pagesPerTag,
+      };
+      const response = await fetch("/api/admin/furtrack/match-runs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          mode: "event",
-          eventId,
-          tags: parseList(candidateTags),
-          postIds: parseList(postIds),
-          maxCandidates,
-          maxPhotos,
-          pagesPerTag,
-        }),
+        body: JSON.stringify(requestPayload),
       });
       const payload = await readJsonResponse<{
         error?: string;
-        result?: EventMatchResult;
-      }>(response, "Unable to find Furtrack matches.");
+        run?: FurtrackMatchRun;
+      }>(response, "Unable to start Furtrack match run.");
 
-      if (!payload.result) {
-        throw new Error(payload.error ?? "Unable to find Furtrack matches.");
+      if (!payload.run) {
+        throw new Error(payload.error ?? "Unable to start Furtrack match run.");
       }
 
-      setResult(payload.result);
+      let run = payload.run;
+      setMatchRun(run);
+      setNotice(formatRunProgress(run));
+
+      for (let steps = 0; steps < 5000; steps += 1) {
+        if (run.status === "SUCCEEDED" || run.status === "FAILED") {
+          break;
+        }
+
+        const stepResponse = await fetch(
+          `/api/admin/furtrack/match-runs/${encodeURIComponent(run.id)}/step`,
+          {
+            method: "POST",
+          },
+        );
+        const stepPayload = await readJsonResponse<{
+          error?: string;
+          run?: FurtrackMatchRun;
+        }>(stepResponse, "Unable to continue Furtrack match run.");
+
+        if (!stepPayload.run) {
+          throw new Error(
+            stepPayload.error ?? "Unable to continue Furtrack match run.",
+          );
+        }
+
+        run = stepPayload.run;
+        setMatchRun(run);
+        setNotice(formatRunProgress(run));
+        await wait(40);
+      }
+
+      if (run.status === "FAILED") {
+        throw new Error(run.errorMessage ?? "Furtrack match run failed.");
+      }
+
+      if (!run.result) {
+        throw new Error("Furtrack match run did not return a result.");
+      }
+
+      setResult(run.result);
       setNotice(
-        `Found ${payload.result.suggestions.length} possible matches from ${payload.result.searched.totalCandidates} candidates.`,
+        `Found ${run.result.suggestions.length} possible matches from ${run.result.searched.totalCandidates} candidates.`,
       );
     } catch (caughtError) {
       setError(
@@ -287,9 +361,20 @@ export function FurtrackMatchTestPanel({
       return;
     }
 
+    const exactSuggestions = visibleSuggestions.filter((suggestion) =>
+      isExactMatch(suggestion.bestMatch),
+    );
+
+    if (!exactSuggestions.length) {
+      setError("Run matching first. No exact matches are currently visible.");
+      return;
+    }
+
     if (
       !window.confirm(
-        "Sync tags for exact visual matches only? Non-exact matches will stay untouched.",
+        `Sync ${exactSuggestions.length} exact visual match${
+          exactSuggestions.length === 1 ? "" : "es"
+        }? Non-exact matches will stay untouched.`,
       )
     ) {
       return;
@@ -300,27 +385,49 @@ export function FurtrackMatchTestPanel({
     setNotice(null);
 
     try {
-      const response = await fetch("/api/admin/furtrack/sync-exact-matches", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          eventId,
-          tags: parseList(candidateTags),
-          postIds: parseList(postIds),
-          maxCandidates,
-          maxPhotos,
-          pagesPerTag,
-        }),
-      });
-      const payload = await readJsonResponse<{
-        error?: string;
-        message?: string;
-      }>(response, "Unable to sync exact matches.");
+      const failed: string[] = [];
 
-      setNotice(payload.message ?? "Exact matches synced.");
-      await findMatches();
+      for (const suggestion of exactSuggestions) {
+        const response = await fetch("/api/admin/furtrack/sync-match", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            photoId: suggestion.localPhoto.id,
+            postId: suggestion.bestMatch.postId,
+          }),
+        });
+
+        try {
+          await readJsonResponse<{
+            error?: string;
+            message?: string;
+          }>(response, "Unable to sync exact match.");
+          setDismissedKeys((current) => [
+            ...current,
+            `${suggestion.localPhoto.id}:${suggestion.bestMatch.postId}`,
+          ]);
+        } catch (caughtError) {
+          failed.push(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Unable to sync exact match.",
+          );
+        }
+      }
+
+      setNotice(
+        failed.length
+          ? `Synced ${exactSuggestions.length - failed.length} exact matches. ${failed.length} failed.`
+          : `Synced ${exactSuggestions.length} exact match${
+              exactSuggestions.length === 1 ? "" : "es"
+            }.`,
+      );
+
+      if (failed.length) {
+        setError(failed.slice(0, 3).join(" "));
+      }
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -426,7 +533,7 @@ export function FurtrackMatchTestPanel({
             <button
               type="button"
               onClick={() => void syncExactMatches()}
-              disabled={syncPending || pending || !eventId}
+              disabled={syncPending || pending || !eventId || !exactCount}
               className="rounded-full border border-[#9588ff]/35 bg-[#9588ff]/14 px-4 py-2 text-sm text-white transition hover:bg-[#9588ff]/20 disabled:opacity-40"
             >
               {syncPending ? "Syncing..." : "Sync exact matches"}
@@ -576,6 +683,32 @@ export function FurtrackMatchTestPanel({
             <span className="glass-chip px-4 py-2">
               searched {result.searched.tags.join(", ") || "specific posts"}
             </span>
+          </div>
+        ) : null}
+
+        {pending && matchRun?.progress ? (
+          <div className="space-y-2">
+            <div className="h-2 overflow-hidden rounded-full bg-white/8">
+              <div
+                className="h-full rounded-full bg-[#9588ff] transition-[width] duration-300"
+                style={{
+                  width: `${
+                    matchRun.progress.total
+                      ? Math.min(
+                          100,
+                          Math.round(
+                            (matchRun.progress.current / matchRun.progress.total) *
+                              100,
+                          ),
+                        )
+                      : 4
+                  }%`,
+                }}
+              />
+            </div>
+            <p className="text-xs uppercase tracking-[0.18em] text-white/42">
+              {matchRun.progress.label}
+            </p>
           </div>
         ) : null}
 
