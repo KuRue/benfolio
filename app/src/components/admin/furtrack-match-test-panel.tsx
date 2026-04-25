@@ -561,8 +561,39 @@ export function FurtrackMatchTestPanel({
     }
   }
 
-  function dismissMatch(photoId: string, postId: string) {
-    setDismissedKeys((current) => [...current, `${photoId}:${postId}`]);
+  async function dismissMatch(photoId: string, postId: string) {
+    // Hide it immediately for snappy UI; persist asynchronously so the
+    // next scan won't re-suggest the pair across reloads or on the
+    // server side. If the network call fails we surface the error but
+    // keep the local hide — the user can re-run match to retry.
+    setDismissedKeys((current) =>
+      current.includes(`${photoId}:${postId}`)
+        ? current
+        : [...current, `${photoId}:${postId}`],
+    );
+
+    try {
+      const response = await fetch("/api/admin/furtrack/dismiss-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoId, postId }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(
+          payload.error ?? "Unable to record Furtrack dismissal.",
+        );
+      }
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to record Furtrack dismissal.",
+      );
+    }
   }
 
   return (
@@ -906,7 +937,7 @@ export function FurtrackMatchTestPanel({
                           <button
                             type="button"
                             onClick={() =>
-                              dismissMatch(
+                              void dismissMatch(
                                 suggestion.localPhoto.id,
                                 suggestion.bestMatch.postId,
                               )

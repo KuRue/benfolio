@@ -631,6 +631,94 @@ export async function testFurtrackMatchesForPhoto(args: {
   };
 }
 
+/**
+ * Pre-computes which photos and Furtrack posts should be excluded from
+ * a match-test scan for a given event:
+ *
+ *  - `linkedPhotoIds` — photos that already have a confirmed Furtrack
+ *    pairing (ExternalAssetLink with source=FURTRACK, assetType=PHOTO_POST).
+ *    These are skipped at fingerprint time so we don't waste cycles
+ *    re-matching photos the user already accepted.
+ *  - `linkedPostIds` — Furtrack post IDs that link to *any* photo
+ *    anywhere. Skipped from suggestions so a single Furtrack post can't
+ *    be re-suggested for a different benfolio photo.
+ *  - `dismissedPairs` — explicit "no, this isn't a match" decisions
+ *    persisted in FurtrackMatchDismissal. Scoped by `(photoId, postId)`
+ *    so dismissing post 12345 for photo A doesn't hide it as a
+ *    candidate for photo B.
+ */
+export type FurtrackEventExclusions = {
+  linkedPhotoIds: Set<string>;
+  linkedPostIds: Set<string>;
+  dismissedPairs: Set<string>;
+};
+
+export function dismissalPairKey(photoId: string, postId: string) {
+  return `${photoId}:${postId}`;
+}
+
+export async function loadFurtrackEventExclusions(
+  eventId: string,
+): Promise<FurtrackEventExclusions> {
+  const [eventLinks, globalLinks, eventPhotoIds] = await Promise.all([
+    prisma.externalAssetLink.findMany({
+      where: {
+        source: "FURTRACK",
+        assetType: "PHOTO_POST",
+        eventId,
+      },
+      select: { photoId: true, externalId: true },
+    }),
+    prisma.externalAssetLink.findMany({
+      where: {
+        source: "FURTRACK",
+        assetType: "PHOTO_POST",
+        photoId: { not: null },
+      },
+      select: { externalId: true },
+    }),
+    prisma.photo.findMany({
+      where: { eventId },
+      select: { id: true },
+    }),
+  ]);
+
+  const linkedPhotoIds = new Set<string>();
+  for (const link of eventLinks) {
+    if (link.photoId) {
+      linkedPhotoIds.add(link.photoId);
+    }
+  }
+
+  const linkedPostIds = new Set<string>();
+  for (const link of eventLinks) {
+    if (link.externalId) {
+      linkedPostIds.add(link.externalId);
+    }
+  }
+  for (const link of globalLinks) {
+    if (link.externalId) {
+      linkedPostIds.add(link.externalId);
+    }
+  }
+
+  const photoIds = eventPhotoIds.map((photo) => photo.id);
+  const dismissals = photoIds.length
+    ? await prisma.furtrackMatchDismissal.findMany({
+        where: { photoId: { in: photoIds } },
+        select: { photoId: true, externalPostId: true },
+      })
+    : [];
+  const dismissedPairs = new Set<string>();
+  for (const dismissal of dismissals) {
+    dismissedPairs.add(
+      dismissalPairKey(dismissal.photoId, dismissal.externalPostId),
+    );
+  }
+
+  return { linkedPhotoIds, linkedPostIds, dismissedPairs };
+}
+
 export async function testFurtrackMatchesForEvent(args: {
   eventId: string;
   tags?: string[];
@@ -651,6 +739,8 @@ export async function testFurtrackMatchesForEvent(args: {
   const maxPhotos = Math.min(Math.max(args.maxPhotos ?? 80, 1), 500);
   const minScore = args.minScore ?? 0.74;
 
+  const exclusions = await loadFurtrackEventExclusions(args.eventId);
+
   const event = await prisma.event.findUnique({
     where: {
       id: args.eventId,
@@ -665,6 +755,11 @@ export async function testFurtrackMatchesForEvent(args: {
       photos: {
         where: {
           processingState: "READY",
+          // Skip photos that already have a confirmed Furtrack pairing.
+          // Their tags are refreshed via /api/admin/furtrack/refresh-linked.
+          id: exclusions.linkedPhotoIds.size
+            ? { notIn: [...exclusions.linkedPhotoIds] }
+            : undefined,
         },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         take: maxPhotos,
@@ -794,6 +889,19 @@ export async function testFurtrackMatchesForEvent(args: {
       continue;
     }
 
+    // Skip Furtrack posts already linked to any photo, and (photo, post)
+    // pairs explicitly dismissed by the admin.
+    if (exclusions.linkedPostIds.has(pair.match.postId)) {
+      continue;
+    }
+    if (
+      exclusions.dismissedPairs.has(
+        dismissalPairKey(pair.localPhoto.photo.id, pair.match.postId),
+      )
+    ) {
+      continue;
+    }
+
     usedPhotoIds.add(pair.localPhoto.photo.id);
     usedPostIds.add(pair.match.postId);
 
@@ -813,7 +921,14 @@ export async function testFurtrackMatchesForEvent(args: {
       alternatives:
         perPhotoMatches
           .find((entry) => entry.localPhoto.photo.id === pair.localPhoto.photo.id)
-          ?.matches.filter((match) => match.postId !== pair.match.postId)
+          ?.matches.filter(
+            (match) =>
+              match.postId !== pair.match.postId &&
+              !exclusions.linkedPostIds.has(match.postId) &&
+              !exclusions.dismissedPairs.has(
+                dismissalPairKey(pair.localPhoto.photo.id, match.postId),
+              ),
+          )
           .slice(0, 3) ?? [],
     });
   }
@@ -942,9 +1057,13 @@ async function saveRunPayload(jobId: string, payload: FurtrackMatchRunPayload) {
   return summarizeRun(payload, updated);
 }
 
-function buildEventMatchResultFromPayload(
+async function buildEventMatchResultFromPayload(
   payload: FurtrackMatchRunPayload,
-): FurtrackEventMatchTestResult {
+): Promise<FurtrackEventMatchTestResult> {
+  // Re-fetch exclusions at finalize time so any links/dismissals added
+  // during the long-running scan are honored on first results display.
+  const exclusions = await loadFurtrackEventExclusions(payload.event.id);
+
   const perPhotoMatches = payload.locals.map((localPhoto) => {
     const matches = payload.candidates
       .map((candidate) =>
@@ -985,6 +1104,20 @@ function buildEventMatchResultFromPayload(
       continue;
     }
 
+    if (exclusions.linkedPhotoIds.has(pair.localPhoto.photo.id)) {
+      continue;
+    }
+    if (exclusions.linkedPostIds.has(pair.match.postId)) {
+      continue;
+    }
+    if (
+      exclusions.dismissedPairs.has(
+        dismissalPairKey(pair.localPhoto.photo.id, pair.match.postId),
+      )
+    ) {
+      continue;
+    }
+
     usedPhotoIds.add(pair.localPhoto.photo.id);
     usedPostIds.add(pair.match.postId);
 
@@ -1004,7 +1137,14 @@ function buildEventMatchResultFromPayload(
       alternatives:
         perPhotoMatches
           .find((entry) => entry.localPhoto.photo.id === pair.localPhoto.photo.id)
-          ?.matches.filter((match) => match.postId !== pair.match.postId)
+          ?.matches.filter(
+            (match) =>
+              match.postId !== pair.match.postId &&
+              !exclusions.linkedPostIds.has(match.postId) &&
+              !exclusions.dismissedPairs.has(
+                dismissalPairKey(pair.localPhoto.photo.id, match.postId),
+              ),
+          )
           .slice(0, 3) ?? [],
     });
   }
@@ -1057,6 +1197,7 @@ export async function createFurtrackMatchRun(args: {
     DEFAULT_LIVE_FALLBACK_PAGES_PER_TAG,
   );
   const minScore = args.minScore ?? 0.74;
+  const exclusions = await loadFurtrackEventExclusions(args.eventId);
   const event = await prisma.event.findUnique({
     where: {
       id: args.eventId,
@@ -1071,6 +1212,11 @@ export async function createFurtrackMatchRun(args: {
       photos: {
         where: {
           processingState: "READY",
+          // Skip photos already linked to a Furtrack post — their tags
+          // are refreshed by the dedicated refresh-linked endpoint.
+          id: exclusions.linkedPhotoIds.size
+            ? { notIn: [...exclusions.linkedPhotoIds] }
+            : undefined,
         },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         take: maxPhotos,
@@ -1324,7 +1470,7 @@ export async function stepFurtrackMatchRun(jobId: string) {
     return saveRunPayload(jobId, payload);
   }
 
-  payload.result = buildEventMatchResultFromPayload(payload);
+  payload.result = await buildEventMatchResultFromPayload(payload);
   payload.stage = "complete";
   payload.progress = {
     current: payload.progress.total,

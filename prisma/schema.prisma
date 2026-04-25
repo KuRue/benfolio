@@ -225,6 +225,7 @@ model Photo {
   derivatives        PhotoDerivative[]
   tags               PhotoTag[]
   externalLinks      ExternalAssetLink[]
+  furtrackDismissals FurtrackMatchDismissal[]
   importItems        ImportItem[]
   views              PhotoView[]
 
@@ -330,6 +331,21 @@ model PhotoTag {
   tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([photoId, tagId])
+}
+
+/// Persists "no, don't suggest this Furtrack post for this benfolio
+/// photo again" decisions from the match-test panel. Scoped to the
+/// (photo, post) pair because the same Furtrack post can be a wrong
+/// match for one photo but a right match for a different photo in
+/// the same event.
+model FurtrackMatchDismissal {
+  photoId        String
+  externalPostId String
+  dismissedAt    DateTime @default(now())
+  photo          Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@id([photoId, externalPostId])
+  @@index([externalPostId])
 }
 
 model ExternalAssetLink {
