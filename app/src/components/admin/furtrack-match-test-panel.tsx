@@ -14,6 +14,7 @@ type AdminEventOption = {
 type FurtrackSettings = {
   baseUrl: string;
   impersonate: string;
+  photographerHandle: string | null;
   hasSavedToken: boolean;
   hasEnvToken: boolean;
 };
@@ -103,13 +104,25 @@ export function FurtrackMatchTestPanel({
   furtrackSettings,
 }: FurtrackMatchPanelProps) {
   const [eventId, setEventId] = useState(events[0]?.id ?? "");
-  const [candidateTags, setCandidateTags] = useState("");
+  // Pre-fill the candidate-tags textarea with the photographer feed when a
+  // handle is configured. Furtrack's event-tag naming is unpredictable
+  // (e.g. `5:megaplex` exists but `5:megaplex2025` does not), so scanning
+  // your own `3:<handle>` feed is a more reliable default than guessing
+  // event tag names from benfolio event titles.
+  const [candidateTags, setCandidateTags] = useState(
+    furtrackSettings.photographerHandle
+      ? `3:${furtrackSettings.photographerHandle}`
+      : "",
+  );
   const [postIds, setPostIds] = useState("");
   const [maxCandidates, setMaxCandidates] = useState(120);
   const [maxPhotos, setMaxPhotos] = useState(120);
   const [pagesPerTag, setPagesPerTag] = useState(2);
   const [baseUrl, setBaseUrl] = useState(furtrackSettings.baseUrl);
   const [impersonate, setImpersonate] = useState(furtrackSettings.impersonate);
+  const [photographerHandle, setPhotographerHandle] = useState(
+    furtrackSettings.photographerHandle ?? "",
+  );
   const [authToken, setAuthToken] = useState("");
   const [hasSavedToken, setHasSavedToken] = useState(furtrackSettings.hasSavedToken);
   const [pending, setPending] = useState(false);
@@ -150,6 +163,7 @@ export function FurtrackMatchTestPanel({
         body: JSON.stringify({
           baseUrl,
           impersonate,
+          photographerHandle,
           authToken: options?.clearToken ? "" : authToken,
           clearToken: options?.clearToken ?? false,
         }),
@@ -160,6 +174,7 @@ export function FurtrackMatchTestPanel({
         settings?: {
           baseUrl: string;
           impersonate: string;
+          photographerHandle: string | null;
           hasSavedToken: boolean;
         };
       };
@@ -170,6 +185,7 @@ export function FurtrackMatchTestPanel({
 
       setBaseUrl(payload.settings.baseUrl);
       setImpersonate(payload.settings.impersonate);
+      setPhotographerHandle(payload.settings.photographerHandle ?? "");
       setHasSavedToken(payload.settings.hasSavedToken);
       setAuthToken("");
       setNotice(options?.clearToken ? "Furtrack token cleared." : "Furtrack settings saved.");
@@ -449,6 +465,22 @@ export function FurtrackMatchTestPanel({
                 </button>
               </div>
             </div>
+
+            <label className="block space-y-2">
+              <span className="text-sm text-white/68">
+                Photographer handle{" "}
+                <span className="text-white/40">
+                  (optional — pre-fills candidate tags with{" "}
+                  <code className="text-white/56">3:&lt;handle&gt;</code>)
+                </span>
+              </span>
+              <input
+                value={photographerHandle}
+                onChange={(event) => setPhotographerHandle(event.target.value)}
+                className="admin-input"
+                placeholder="kurue"
+              />
+            </label>
 
             <div className="grid gap-4 xl:grid-cols-2">
               <label className="block space-y-2">

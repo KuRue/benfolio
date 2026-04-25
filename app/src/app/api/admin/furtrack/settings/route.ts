@@ -11,6 +11,7 @@ const furtrackSettingsSchema = z.object({
   authToken: z.string().optional(),
   baseUrl: z.string().url().optional().or(z.literal("")),
   impersonate: z.string().min(1).max(64).optional().or(z.literal("")),
+  photographerHandle: z.string().max(120).optional().or(z.literal("")),
   clearToken: z.boolean().optional(),
 });
 

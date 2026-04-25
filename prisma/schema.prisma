@@ -113,6 +113,11 @@ model AppSettings {
   furtrackAuthToken        String?
   furtrackBaseUrl          String?
   furtrackImpersonate      String?
+  /// Optional Furtrack photographer handle (the value of the `3:` tag).
+  /// When set, the match-test panel defaults its candidate-tags input
+  /// to `3:<handle>` so "Find matches" scans your own Furtrack feed
+  /// instead of requiring you to type guess-y event tag names.
+  furtrackPhotographerHandle String?
   /// When true, public covers are served through the Cloudflare Image
   /// Transformations proxy (`/cdn-cgi/image/...`). Requires the app
   /// hostname to be proxied through Cloudflare (orange-cloud DNS OR
