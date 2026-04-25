@@ -39,6 +39,7 @@ type FurtrackCacheSummary = {
       tag: string | null;
       pages: number | null;
       maxPosts: number | null;
+      syncAll: boolean | null;
     } | null;
   }>;
 };
@@ -202,9 +203,6 @@ export function FurtrackMatchTestPanel({
       : "",
   );
   const [postIds, setPostIds] = useState("");
-  const [maxCandidates, setMaxCandidates] = useState(800);
-  const [maxPhotos, setMaxPhotos] = useState(250);
-  const [pagesPerTag, setPagesPerTag] = useState(5);
   const [baseUrl, setBaseUrl] = useState(furtrackSettings.baseUrl);
   const [impersonate, setImpersonate] = useState(furtrackSettings.impersonate);
   const [photographerHandle, setPhotographerHandle] = useState(
@@ -290,7 +288,9 @@ export function FurtrackMatchTestPanel({
   }
 
   async function syncCache() {
-    const tag = parseList(candidateTags)[0] || (photographerHandle ? `3:${photographerHandle}` : "");
+    const tag =
+      parseList(candidateTags)[0] ||
+      (photographerHandle ? `3:${photographerHandle}` : "");
 
     if (!tag) {
       setError("Set a photographer handle or candidate tag first.");
@@ -299,7 +299,7 @@ export function FurtrackMatchTestPanel({
 
     if (
       !window.confirm(
-        `Queue a Furtrack cache sync for ${tag}? This runs in the worker and may take a while.`,
+        `Queue a full Furtrack cache sync for ${tag}? This runs in the worker and may take a while.`,
       )
     ) {
       return;
@@ -317,8 +317,6 @@ export function FurtrackMatchTestPanel({
         },
         body: JSON.stringify({
           tag,
-          pages: pagesPerTag,
-          maxPosts: maxCandidates,
           refreshExisting: true,
         }),
       });
@@ -364,9 +362,6 @@ export function FurtrackMatchTestPanel({
         eventId,
         tags: parseList(candidateTags),
         postIds: parseList(postIds),
-        maxCandidates,
-        maxPhotos,
-        pagesPerTag,
       };
       const response = await fetch("/api/admin/furtrack/match-runs", {
         method: "POST",
@@ -654,8 +649,9 @@ export function FurtrackMatchTestPanel({
             <div className="space-y-1 text-xs text-white/42 xl:col-span-2">
               {furtrackCache.recentJobs.slice(0, 2).map((job) => (
                 <p key={job.id}>
-                  {job.payload?.tag ?? "Furtrack"} · {job.status.toLowerCase()} ·{" "}
-                  {job.processedItems}/{job.totalItems || "?"}
+                  {job.payload?.tag ?? "Furtrack"} · all posts ·{" "}
+                  {job.status.toLowerCase()} · {job.processedItems}/
+                  {job.totalItems || "?"}
                   {job.errorMessage ? ` · ${job.errorMessage.split("\n")[0]}` : ""}
                 </p>
               ))}
@@ -750,42 +746,6 @@ export function FurtrackMatchTestPanel({
                   onChange={(event) => setPostIds(event.target.value)}
                   className="admin-textarea min-h-28"
                   placeholder="Optional Furtrack post IDs"
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <label className="block space-y-2">
-                <span className="text-sm text-white/68">Max candidates</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={2000}
-                  value={maxCandidates}
-                  onChange={(event) => setMaxCandidates(Number(event.target.value))}
-                  className="admin-input"
-                />
-              </label>
-              <label className="block space-y-2">
-                <span className="text-sm text-white/68">Max photos</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={maxPhotos}
-                  onChange={(event) => setMaxPhotos(Number(event.target.value))}
-                  className="admin-input"
-                />
-              </label>
-              <label className="block space-y-2">
-                <span className="text-sm text-white/68">Pages per tag</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={pagesPerTag}
-                  onChange={(event) => setPagesPerTag(Number(event.target.value))}
-                  className="admin-input"
                 />
               </label>
             </div>

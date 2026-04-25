@@ -11,14 +11,16 @@ const FURTRACK_PUBLIC_BASE_URL = "https://www.furtrack.com";
 const HASH_WIDTH = 9;
 const HASH_HEIGHT = 8;
 const HASH_BITS = 64;
+const FURTRACK_CACHE_SYNC_POST_LIMIT = 50_000;
 
 type FurtrackCacheSyncPayload = {
   kind: "furtrack-cache-sync";
   version: 1;
   tag: string;
-  pages: number;
+  pages: number | null;
   maxPosts: number;
   refreshExisting: boolean;
+  syncAll: boolean;
 };
 
 type FurtrackRuntimeSettings = {
@@ -137,12 +139,13 @@ function parseCacheSyncPayload(value: Prisma.JsonValue | null) {
     pages:
       typeof value.pages === "number"
         ? Math.min(Math.max(Math.trunc(value.pages), 1), 25)
-        : 10,
+        : null,
     maxPosts:
       typeof value.maxPosts === "number"
-        ? Math.min(Math.max(Math.trunc(value.maxPosts), 1), 5000)
-        : 2000,
+        ? Math.min(Math.max(Math.trunc(value.maxPosts), 1), FURTRACK_CACHE_SYNC_POST_LIMIT)
+        : FURTRACK_CACHE_SYNC_POST_LIMIT,
     refreshExisting: value.refreshExisting !== false,
+    syncAll: value.syncAll === true || typeof value.pages !== "number",
   } satisfies FurtrackCacheSyncPayload;
 }
 
@@ -843,24 +846,41 @@ export async function processFurtrackCacheJob(importJobId: string) {
   const postIds = new Set<string>();
   const errors: string[] = [];
 
-  for (let page = 0; page < payload.pages && postIds.size < payload.maxPosts; page += 1) {
+  let page = 0;
+
+  while (
+    postIds.size < payload.maxPosts &&
+    (payload.pages === null || page < payload.pages)
+  ) {
     try {
       const pagePostIds = await loadFurtrackPostIdsByTagPage({
         tag: payload.tag,
         page,
         maxPosts: payload.maxPosts - postIds.size,
       });
+      let addedCount = 0;
 
       for (const postId of pagePostIds) {
+        const beforeSize = postIds.size;
         postIds.add(postId);
+        if (postIds.size > beforeSize) {
+          addedCount += 1;
+        }
 
         if (postIds.size >= payload.maxPosts) {
           break;
         }
       }
+
+      if (pagePostIds.length === 0 || addedCount === 0) {
+        break;
+      }
     } catch (error) {
       errors.push(error instanceof Error ? error.message : `Furtrack page ${page} failed.`);
+      break;
     }
+
+    page += 1;
   }
 
   await prisma.importJob.update({
@@ -872,6 +892,7 @@ export async function processFurtrackCacheJob(importJobId: string) {
       payloadJson: {
         ...payload,
         discoveredPostCount: postIds.size,
+        discoveredPages: page + 1,
       },
     },
   });

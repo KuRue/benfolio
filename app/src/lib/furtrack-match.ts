@@ -19,6 +19,9 @@ const HASH_WIDTH = 9;
 const HASH_HEIGHT = 8;
 const HASH_BITS = 64;
 const DEFAULT_MAX_CANDIDATES = 40;
+const DEFAULT_EVENT_MATCH_MAX_CANDIDATES = 50_000;
+const DEFAULT_EVENT_MATCH_MAX_PHOTOS = 10_000;
+const DEFAULT_LIVE_FALLBACK_PAGES_PER_TAG = 25;
 
 type ImageFingerprint = {
   hash: string;
@@ -1041,9 +1044,18 @@ export async function createFurtrackMatchRun(args: {
   const explicitPostIds = [
     ...new Set((args.postIds ?? []).map((postId) => postId.trim()).filter(Boolean)),
   ];
-  const maxCandidates = Math.min(Math.max(args.maxCandidates ?? 800, 1), 2000);
-  const maxPhotos = Math.min(Math.max(args.maxPhotos ?? 250, 1), 500);
-  const pagesPerTag = Math.min(Math.max(args.pagesPerTag ?? 5, 1), 10);
+  const maxCandidates = Math.min(
+    Math.max(args.maxCandidates ?? DEFAULT_EVENT_MATCH_MAX_CANDIDATES, 1),
+    DEFAULT_EVENT_MATCH_MAX_CANDIDATES,
+  );
+  const maxPhotos = Math.min(
+    Math.max(args.maxPhotos ?? DEFAULT_EVENT_MATCH_MAX_PHOTOS, 1),
+    DEFAULT_EVENT_MATCH_MAX_PHOTOS,
+  );
+  const pagesPerTag = Math.min(
+    Math.max(args.pagesPerTag ?? DEFAULT_LIVE_FALLBACK_PAGES_PER_TAG, 1),
+    DEFAULT_LIVE_FALLBACK_PAGES_PER_TAG,
+  );
   const minScore = args.minScore ?? 0.74;
   const event = await prisma.event.findUnique({
     where: {
@@ -1108,7 +1120,7 @@ export async function createFurtrackMatchRun(args: {
   });
   const useCachedCandidates = cachedCandidates.length > 0;
   const initialCandidateTotal = useCachedCandidates
-    ? cachedCandidates.length
+    ? 0
     : candidateTags.length
       ? maxCandidates
       : explicitPostIds.length;
@@ -1266,7 +1278,7 @@ export async function stepFurtrackMatchRun(jobId: string) {
         0,
         payload.request.maxCandidates,
       );
-      payload.stage = "candidates";
+      payload.stage = payload.discovery.postIds.length ? "candidates" : "finalize";
     }
 
     return saveRunPayload(jobId, payload);

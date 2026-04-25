@@ -6,8 +6,6 @@ import { enqueueFurtrackCacheSync } from "@/lib/furtrack-cache";
 
 const cacheSyncSchema = z.object({
   tag: z.string().min(1).max(160),
-  pages: z.number().int().min(1).max(25).optional(),
-  maxPosts: z.number().int().min(1).max(5000).optional(),
   refreshExisting: z.boolean().optional(),
 });
 
@@ -38,8 +36,6 @@ export async function POST(request: Request) {
   try {
     const job = await enqueueFurtrackCacheSync({
       tag: parsed.data.tag,
-      pages: parsed.data.pages ?? 10,
-      maxPosts: parsed.data.maxPosts ?? 2000,
       refreshExisting: parsed.data.refreshExisting ?? true,
       requestedById: admin.id,
     });

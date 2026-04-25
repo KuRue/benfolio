@@ -6,6 +6,8 @@ import { parseFurtrackTags } from "@/lib/furtrack";
 import { prisma } from "@/lib/prisma";
 import { enqueueImportProcessing } from "@/lib/queue";
 
+const FURTRACK_CACHE_SYNC_POST_LIMIT = 50_000;
+
 type CachedPostForMatch = {
   postId: string;
   submitUserId: string | null;
@@ -247,6 +249,10 @@ export async function getAdminFurtrackCacheSummary() {
                 typeof job.payloadJson.maxPosts === "number"
                   ? job.payloadJson.maxPosts
                   : null,
+              syncAll:
+                typeof job.payloadJson.syncAll === "boolean"
+                  ? job.payloadJson.syncAll
+                  : null,
             }
           : null,
     })),
@@ -255,8 +261,6 @@ export async function getAdminFurtrackCacheSummary() {
 
 export async function enqueueFurtrackCacheSync(args: {
   tag: string;
-  pages: number;
-  maxPosts: number;
   refreshExisting: boolean;
   requestedById?: string | null;
 }) {
@@ -270,8 +274,8 @@ export async function enqueueFurtrackCacheSync(args: {
     kind: "furtrack-cache-sync",
     version: 1,
     tag,
-    pages: Math.min(Math.max(Math.trunc(args.pages), 1), 25),
-    maxPosts: Math.min(Math.max(Math.trunc(args.maxPosts), 1), 5000),
+    syncAll: true,
+    maxPosts: FURTRACK_CACHE_SYNC_POST_LIMIT,
     refreshExisting: args.refreshExisting,
     requestedAt: new Date().toISOString(),
   } satisfies Prisma.InputJsonObject;

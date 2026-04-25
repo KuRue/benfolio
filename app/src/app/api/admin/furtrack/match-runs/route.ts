@@ -7,10 +7,10 @@ import { createFurtrackMatchRun } from "@/lib/furtrack-match";
 const matchRunSchema = z.object({
   eventId: z.string().min(1),
   tags: z.array(z.string().min(1)).max(10).optional(),
-  postIds: z.array(z.string().min(1)).max(2000).optional(),
-  pagesPerTag: z.number().int().min(1).max(10).optional(),
-  maxCandidates: z.number().int().min(1).max(2000).optional(),
-  maxPhotos: z.number().int().min(1).max(500).optional(),
+  postIds: z.array(z.string().min(1)).max(50000).optional(),
+  pagesPerTag: z.number().int().min(1).max(25).optional(),
+  maxCandidates: z.number().int().min(1).max(50000).optional(),
+  maxPhotos: z.number().int().min(1).max(10000).optional(),
   minScore: z.number().min(0).max(1).optional(),
 });
 

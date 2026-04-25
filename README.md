@@ -336,11 +336,13 @@ The matcher:
 - shows local and Furtrack photos side-by-side for review
 - can sync one confirmed match or all exact `100%` visual-hash matches
 
-The **Sync Furtrack cache** action queues a worker job that pulls post IDs for the selected
-candidate tag, fetches each post's tags and image fingerprint, and stores them locally.
-Run it for your photographer tag such as `3:your_handle`; later album matching can use the
-local cache instead of re-fetching the same Furtrack posts for every event. Re-run it as
-maintenance when old Furtrack posts receive new tags.
+The **Sync Furtrack cache** action queues a worker job that walks the full selected tag
+feed until Furtrack returns no more posts, then fetches each post's tags and image
+fingerprint and stores them locally. Run it for your photographer tag such as
+`3:your_handle`; later album matching can use the local cache instead of re-fetching the
+same Furtrack posts for every event. Re-run it as maintenance when old Furtrack posts
+receive new tags. The worker keeps an internal high safety ceiling to avoid runaway jobs,
+but the admin UI does not require guessing page or candidate counts.
 
 The **Sync exact matches** action uses the exact matches currently shown, then imports
 Furtrack tags and creates Furtrack external links for those photos.
