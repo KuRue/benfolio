@@ -364,11 +364,51 @@ export function FurtrackMatchTestPanel({
     setMatchRun(null);
 
     try {
+      // Refresh tags on photos already linked to a Furtrack post first.
+      // The match scan will then skip those photos (server-side filter)
+      // so the admin only sees genuinely new matches to confirm.
+      let refreshNotice = "";
+      try {
+        const refreshResponse = await fetch(
+          "/api/admin/furtrack/refresh-linked",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventId }),
+          },
+        );
+        const refreshPayload = await readJsonResponse<{
+          error?: string;
+          message?: string;
+          result?: {
+            totalLinked: number;
+            refreshed: number;
+            failed: number;
+          };
+        }>(refreshResponse, "Unable to refresh Furtrack-linked tags.");
+
+        if (refreshPayload.result && refreshPayload.result.totalLinked > 0) {
+          const { refreshed, failed, totalLinked } = refreshPayload.result;
+          refreshNotice = `Refreshed tags on ${refreshed}/${totalLinked} linked photos${
+            failed ? ` (${failed} failed)` : ""
+          }. `;
+        }
+      } catch (refreshError) {
+        // Non-fatal: if the refresh fails we still want to scan for new
+        // matches. Surface a warning prefix on the notice line.
+        refreshNotice = `Tag refresh on linked photos failed (${
+          refreshError instanceof Error ? refreshError.message : "unknown"
+        }). `;
+      }
+
       const requestPayload = {
         eventId,
         tags: parseList(candidateTags),
         postIds: parseList(postIds),
       };
+      if (refreshNotice) {
+        setNotice(`${refreshNotice}Starting match scan...`);
+      }
       const response = await fetch("/api/admin/furtrack/match-runs", {
         method: "POST",
         headers: {

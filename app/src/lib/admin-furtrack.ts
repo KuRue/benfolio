@@ -218,3 +218,78 @@ export async function importFurtrackTagsForPhoto(args: {
       importPayload.source.kind === "post" ? importPayload.source.externalUrl : null,
   };
 }
+
+export type FurtrackLinkedRefreshResult = {
+  eventId: string;
+  totalLinked: number;
+  refreshed: number;
+  failed: number;
+  errors: Array<{
+    photoId: string;
+    postId: string;
+    error: string;
+  }>;
+};
+
+/**
+ * Re-fetches Furtrack tags for every photo in `eventId` that already
+ * has a confirmed FURTRACK / PHOTO_POST ExternalAssetLink, and writes
+ * the latest tag set onto the photo. Idempotent — runs through the
+ * existing importFurtrackTagsForPhoto path so PhotoTag, TagAlias, and
+ * the link metadata are all kept in sync.
+ *
+ * Used by `/api/admin/furtrack/refresh-linked` and called automatically
+ * before each match-run so admins don't have to re-confirm photos
+ * they've already paired in earlier sessions.
+ */
+export async function refreshFurtrackLinkedTagsForEvent(args: {
+  eventId: string;
+  requestedById?: string | null;
+}): Promise<FurtrackLinkedRefreshResult> {
+  const links = await prisma.externalAssetLink.findMany({
+    where: {
+      source: "FURTRACK",
+      assetType: "PHOTO_POST",
+      eventId: args.eventId,
+      photoId: { not: null },
+    },
+    select: {
+      photoId: true,
+      externalId: true,
+    },
+  });
+
+  let refreshed = 0;
+  let failed = 0;
+  const errors: FurtrackLinkedRefreshResult["errors"] = [];
+
+  for (const link of links) {
+    if (!link.photoId || !link.externalId) {
+      continue;
+    }
+
+    try {
+      await importFurtrackTagsForPhoto({
+        photoId: link.photoId,
+        reference: link.externalId,
+        requestedById: args.requestedById ?? null,
+      });
+      refreshed += 1;
+    } catch (error) {
+      failed += 1;
+      errors.push({
+        photoId: link.photoId,
+        postId: link.externalId,
+        error: error instanceof Error ? error.message : "Refresh failed.",
+      });
+    }
+  }
+
+  return {
+    eventId: args.eventId,
+    totalLinked: links.length,
+    refreshed,
+    failed,
+    errors,
+  };
+}
