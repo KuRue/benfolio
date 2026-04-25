@@ -13,7 +13,6 @@ import {
 } from "react";
 
 import { ArrowLeft, ArrowRight, Download, Info, Link2, X } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { buildTagSearchQuery, type TagCategoryValue } from "@/lib/tags";
@@ -197,12 +196,14 @@ function DetailsPanel({
   eventHref,
   infoRows,
   tagGroups,
+  onTagSearch,
 }: {
   title: string;
   subtitle: string;
   eventHref: string;
   infoRows: ViewerInfoRow[];
   tagGroups: ViewerTagGroup[];
+  onTagSearch: (query: string) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -250,19 +251,22 @@ function DetailsPanel({
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {group.tags.map((tag) => (
-                    <Link
+                    <button
+                      type="button"
                       key={`${group.category}:${tag.slug ?? tag.name}`}
-                      href={`/search?query=${encodeURIComponent(
-                        buildTagSearchQuery({
-                          category: group.category,
-                          name: tag.name,
-                        }),
-                      )}`}
-                      className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-xs text-white/74 transition hover:border-[#8f73ff]/42 hover:bg-[#6f5cff]/16 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8f73ff]/45"
+                      onClick={() =>
+                        onTagSearch(
+                          buildTagSearchQuery({
+                            category: group.category,
+                            name: tag.name,
+                          }),
+                        )
+                      }
+                      className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-left text-xs text-white/74 transition hover:border-[#8f73ff]/42 hover:bg-[#6f5cff]/16 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#8f73ff]/45"
                       aria-label={`Search ${group.label}: ${tag.name}`}
                     >
                       {tag.name}
-                    </Link>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -273,7 +277,6 @@ function DetailsPanel({
     </div>
   );
 }
-
 export function PhotoViewerClient({
   photoId,
   imageUrl,
@@ -560,6 +563,20 @@ export function PhotoViewerClient({
     });
   }
 
+  function navigateToTagSearch(query: string) {
+    const targetHref = `/search?query=${encodeURIComponent(query)}`;
+    setInfoOpen(false);
+
+    if (isModal) {
+      window.location.assign(targetHref);
+      return;
+    }
+
+    startTransition(() => {
+      router.push(targetHref, { scroll: false });
+    });
+  }
+
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (isTypingTarget(event.target)) {
       return;
@@ -839,6 +856,7 @@ export function PhotoViewerClient({
                   eventHref={eventHref}
                   infoRows={infoRows}
                   tagGroups={tagGroups}
+                  onTagSearch={navigateToTagSearch}
                 />
               </div>
             </aside>
@@ -898,6 +916,7 @@ export function PhotoViewerClient({
                   eventHref={eventHref}
                   infoRows={infoRows}
                   tagGroups={tagGroups}
+                  onTagSearch={navigateToTagSearch}
                 />
               </div>
             </div>
