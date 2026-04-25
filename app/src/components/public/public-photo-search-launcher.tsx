@@ -63,6 +63,10 @@ export function PublicPhotoSearchLauncher({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  // True only after a row is explicitly highlighted with the arrow keys.
+  // Plain Enter opens the larger /search results page; arrow navigation +
+  // Enter keeps the quick "open highlighted result" behavior.
+  const [hasManuallySelected, setHasManuallySelected] = useState(false);
   const deferredQuery = useDeferredValue(query);
 
   const activeResult = results[activeIndex] ?? null;
@@ -96,6 +100,7 @@ export function PublicPhotoSearchLauncher({
     setError(null);
     setLoading(false);
     setActiveIndex(0);
+    setHasManuallySelected(false);
   }
 
   function closeSearch() {
@@ -108,6 +113,20 @@ export function PublicPhotoSearchLauncher({
     setOpen(false);
     startTransition(() => {
       router.push(href, { scroll: false });
+    });
+  }
+
+  function navigateToResultsPage(rawQuery: string) {
+    const trimmed = rawQuery.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    const target = `/search?query=${encodeURIComponent(trimmed)}`;
+    resetSearchState();
+    setOpen(false);
+    startTransition(() => {
+      router.push(target, { scroll: false });
     });
   }
 
@@ -243,6 +262,9 @@ export function PublicPhotoSearchLauncher({
                   onChange={(event) => {
                     const nextQuery = event.target.value;
                     setQuery(nextQuery);
+                    // Reset keyboard selection while typing so plain Enter
+                    // opens the larger results page for the current query.
+                    setHasManuallySelected(false);
 
                     if (!nextQuery.trim()) {
                       setResults([]);
@@ -261,16 +283,22 @@ export function PublicPhotoSearchLauncher({
                       setActiveIndex((current) =>
                         results.length ? Math.min(results.length - 1, current + 1) : 0,
                       );
+                      setHasManuallySelected(true);
                     }
 
                     if (event.key === "ArrowUp") {
                       event.preventDefault();
                       setActiveIndex((current) => Math.max(0, current - 1));
+                      setHasManuallySelected(true);
                     }
 
-                    if (event.key === "Enter" && activeResult) {
+                    if (event.key === "Enter") {
                       event.preventDefault();
-                      navigateToResult(activeResult.href);
+                      if (hasManuallySelected && activeResult) {
+                        navigateToResult(activeResult.href);
+                      } else if (query.trim()) {
+                        navigateToResultsPage(query);
+                      }
                     }
                   }}
                   className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-white/34 sm:text-lg"
@@ -287,7 +315,20 @@ export function PublicPhotoSearchLauncher({
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[0.68rem] uppercase tracking-[0.26em] text-white/42">
                 <p>{resultCountLabel ?? ""}</p>
-                <p className="hidden text-white/34 sm:block">/ or Ctrl+K to open · Esc to dismiss</p>
+                <div className="flex items-center gap-3">
+                  {query.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => navigateToResultsPage(query)}
+                      className="text-[0.68rem] uppercase tracking-[0.26em] text-white/72 transition hover:text-white"
+                    >
+                      See all results →
+                    </button>
+                  ) : null}
+                  <p className="hidden text-white/34 sm:block">
+                    Enter for full page · / or Ctrl+K · Esc dismisses
+                  </p>
+                </div>
               </div>
             </div>
 

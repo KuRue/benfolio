@@ -10,7 +10,9 @@ import { buildDisplayUrl } from "@/lib/storage";
 import { getTagCategoryLabel, normalizeTagName, type TagCategoryValue } from "@/lib/tags";
 
 const DEFAULT_RESULT_LIMIT = 12;
-const MAX_RESULT_LIMIT = 18;
+// Bumped from 18 to accommodate the dedicated /search results page,
+// which loads a richer single-page set than the launcher's quick popup.
+const MAX_RESULT_LIMIT = 96;
 const MAX_QUERY_TERMS = 6;
 
 type SearchCandidate = {
