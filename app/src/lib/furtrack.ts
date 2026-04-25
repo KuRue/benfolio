@@ -713,6 +713,15 @@ async function fetchFurtrackResource(args: {
       if (settings.fetchMode === "curl_cffi") {
         throw error;
       }
+      // auto mode — fall back to plain fetch but make the failure visible
+      // in server logs so the silent fallback doesn't hide a broken setup.
+      // (Cloudflare in front of solar.furtrack.com almost always blocks the
+      // plain-fetch path with a challenge page.)
+      console.warn(
+        `[furtrack] curl_cffi transport failed; falling back to node fetch. Set FURTRACK_FETCH_MODE=curl_cffi to surface the original error. Cause: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 

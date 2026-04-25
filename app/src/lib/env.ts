@@ -51,8 +51,14 @@ const envSchema = z.object({
   FURTRACK_BASE_URL: emptyStringAsUndefined(
     z.string().url().default("https://solar.furtrack.com"),
   ),
+  // curl_cffi is the only transport that survives Cloudflare's challenge in
+  // front of solar.furtrack.com — plain Node fetch gets blocked. The app
+  // container has Python + curl_cffi installed (see app/Dockerfile), so this
+  // default works out of the box in production. Override to "node" in dev if
+  // you don't have Python locally and accept that real Furtrack calls will
+  // fail; "auto" still exists as an escape hatch with silent fallback.
   FURTRACK_FETCH_MODE: emptyStringAsUndefined(
-    z.enum(["auto", "curl_cffi", "node"]).default("auto"),
+    z.enum(["auto", "curl_cffi", "node"]).default("curl_cffi"),
   ),
   FURTRACK_CURL_CFFI_COMMAND: emptyStringAsUndefined(
     z.string().min(1).default("python3"),
