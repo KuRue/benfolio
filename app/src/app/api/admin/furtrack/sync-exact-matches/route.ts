@@ -9,10 +9,10 @@ import { testFurtrackMatchesForEvent } from "@/lib/furtrack-match";
 const exactSyncSchema = z.object({
   eventId: z.string().min(1),
   tags: z.array(z.string().min(1)).max(10).optional(),
-  postIds: z.array(z.string().min(1)).max(200).optional(),
-  pagesPerTag: z.number().int().min(1).max(5).optional(),
-  maxCandidates: z.number().int().min(1).max(200).optional(),
-  maxPhotos: z.number().int().min(1).max(200).optional(),
+  postIds: z.array(z.string().min(1)).max(2000).optional(),
+  pagesPerTag: z.number().int().min(1).max(10).optional(),
+  maxCandidates: z.number().int().min(1).max(2000).optional(),
+  maxPhotos: z.number().int().min(1).max(500).optional(),
 });
 
 export async function POST(request: Request) {
@@ -42,12 +42,10 @@ export async function POST(request: Request) {
   try {
     const matchResult = await testFurtrackMatchesForEvent({
       ...parsed.data,
-      minScore: 1,
+      minScore: 0.97,
     });
     const exactSuggestions = matchResult.suggestions.filter(
-      (suggestion) =>
-        suggestion.bestMatch.score >= 0.999 &&
-        suggestion.bestMatch.hammingDistance === 0,
+      (suggestion) => suggestion.bestMatch.hammingDistance === 0,
     );
     const synced: Array<{
       photoId: string;

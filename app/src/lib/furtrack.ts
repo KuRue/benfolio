@@ -739,14 +739,23 @@ async function fetchFurtrackResource(args: {
 
 async function fetchFurtrackJson(pathname: string, options?: FurtrackFetchOptions) {
   const settings = await getFurtrackRuntimeSettings();
+  const url = `${settings.baseUrl.replace(/\/$/, "")}${pathname}`;
   const text = await fetchFurtrackResource({
-    url: `${settings.baseUrl.replace(/\/$/, "")}${pathname}`,
+    url,
     headers: furtrackApiHeaders(settings),
     responseType: "text",
     options,
   });
 
-  return JSON.parse(text.toString()) as unknown;
+  const body = text.toString();
+
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    throw new Error(
+      `Furtrack returned non-JSON for ${url}${summarizeFurtrackBody(body)}`,
+    );
+  }
 }
 
 export async function loadFurtrackImageBuffer(url: string) {
@@ -788,7 +797,7 @@ export async function loadFurtrackPostIdsByTag(args: {
   maxPosts?: number;
 }) {
   const pages = Math.min(Math.max(args.pages ?? 1, 1), 10);
-  const maxPosts = Math.min(Math.max(args.maxPosts ?? 80, 1), 600);
+  const maxPosts = Math.min(Math.max(args.maxPosts ?? 80, 1), 2000);
   const postIds: string[] = [];
 
   for (let page = 0; page < pages && postIds.length < maxPosts; page += 1) {

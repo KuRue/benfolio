@@ -19,6 +19,7 @@ const DEFAULT_MAX_CANDIDATES = 40;
 
 type ImageFingerprint = {
   hash: string;
+  averageHash: string;
   width: number | null;
   height: number | null;
 };
@@ -268,9 +269,17 @@ function buildEventTagSeeds(event: EventForCandidateTags) {
 
 async function fingerprintImage(buffer: Buffer): Promise<ImageFingerprint> {
   const metadata = await sharp(buffer).rotate().metadata();
-  const pixels = await sharp(buffer)
+  const dHashPixels = await sharp(buffer)
     .rotate()
     .resize(HASH_WIDTH, HASH_HEIGHT, {
+      fit: "fill",
+    })
+    .greyscale()
+    .raw()
+    .toBuffer();
+  const averagePixels = await sharp(buffer)
+    .rotate()
+    .resize(8, 8, {
       fit: "fill",
     })
     .greyscale()
@@ -281,14 +290,23 @@ async function fingerprintImage(buffer: Buffer): Promise<ImageFingerprint> {
 
   for (let row = 0; row < HASH_HEIGHT; row += 1) {
     for (let column = 0; column < HASH_WIDTH - 1; column += 1) {
-      const left = pixels[row * HASH_WIDTH + column] ?? 0;
-      const right = pixels[row * HASH_WIDTH + column + 1] ?? 0;
+      const left = dHashPixels[row * HASH_WIDTH + column] ?? 0;
+      const right = dHashPixels[row * HASH_WIDTH + column + 1] ?? 0;
       hash = (hash << 1n) | (left > right ? 1n : 0n);
     }
   }
 
+  const average =
+    averagePixels.reduce((sum, value) => sum + value, 0) / averagePixels.length;
+  let averageHash = 0n;
+
+  for (const pixel of averagePixels) {
+    averageHash = (averageHash << 1n) | (pixel >= average ? 1n : 0n);
+  }
+
   return {
     hash: bigintToHash(hash),
+    averageHash: bigintToHash(averageHash),
     width: metadata.width ?? null,
     height: metadata.height ?? null,
   };
@@ -335,17 +353,28 @@ async function resolveCandidatePostIds(args: {
   maxCandidates: number;
 }) {
   const postIds = new Set(args.postIds.map((postId) => postId.trim()).filter(Boolean));
+  const errors: CandidateError[] = [];
 
   for (const tag of args.tags) {
     if (postIds.size >= args.maxCandidates) {
       break;
     }
 
-    const tagPostIds = await loadFurtrackPostIdsByTag({
-      tag,
-      pages: args.pagesPerTag,
-      maxPosts: args.maxCandidates - postIds.size,
-    });
+    let tagPostIds: string[];
+
+    try {
+      tagPostIds = await loadFurtrackPostIdsByTag({
+        tag,
+        pages: args.pagesPerTag,
+        maxPosts: args.maxCandidates - postIds.size,
+      });
+    } catch (error) {
+      errors.push({
+        postId: `tag:${tag}`,
+        error: error instanceof Error ? error.message : "Candidate tag failed.",
+      });
+      continue;
+    }
 
     for (const postId of tagPostIds) {
       postIds.add(postId);
@@ -356,7 +385,10 @@ async function resolveCandidatePostIds(args: {
     }
   }
 
-  return [...postIds].slice(0, args.maxCandidates);
+  return {
+    postIds: [...postIds].slice(0, args.maxCandidates),
+    errors,
+  };
 }
 
 function toMatch(args: {
@@ -368,12 +400,21 @@ function toMatch(args: {
     args.localFingerprint.hash,
     args.candidateFingerprint.hash,
   );
-  const visualSimilarity = 1 - hamming / HASH_BITS;
+  const averageHamming = hammingDistance(
+    args.localFingerprint.averageHash,
+    args.candidateFingerprint.averageHash,
+  );
+  const dHashSimilarity = 1 - hamming / HASH_BITS;
+  const averageHashSimilarity = 1 - averageHamming / HASH_BITS;
+  const visualSimilarity = Math.max(
+    dHashSimilarity,
+    dHashSimilarity * 0.7 + averageHashSimilarity * 0.3,
+  );
   const aspectScore = aspectRatioScore(args.localFingerprint, {
     width: args.post.post.metaWidth ?? args.candidateFingerprint.width,
     height: args.post.post.metaHeight ?? args.candidateFingerprint.height,
   });
-  const score = visualSimilarity * 0.9 + aspectScore * 0.1;
+  const score = visualSimilarity * 0.97 + aspectScore * 0.03;
 
   return {
     postId: args.post.post.postId,
@@ -418,7 +459,7 @@ export async function testFurtrackMatchesForPhoto(args: {
   ];
   const maxCandidates = Math.min(
     Math.max(args.maxCandidates ?? DEFAULT_MAX_CANDIDATES, 1),
-    120,
+    500,
   );
 
   if (!tags.length && !explicitPostIds.length) {
@@ -460,18 +501,19 @@ export async function testFurtrackMatchesForPhoto(args: {
     throw new Error("Photo not found.");
   }
 
-  const [{ buffer, previewUrl }, candidatePostIds] = await Promise.all([
+  const [{ buffer, previewUrl }, candidatesResult] = await Promise.all([
     loadLocalPhotoImage(photo),
     resolveCandidatePostIds({
       tags,
       postIds: explicitPostIds,
-      pagesPerTag: Math.min(Math.max(args.pagesPerTag ?? 1, 1), 5),
+      pagesPerTag: Math.min(Math.max(args.pagesPerTag ?? 1, 1), 10),
       maxCandidates,
     }),
   ]);
+  const candidatePostIds = candidatesResult.postIds;
   const localFingerprint = await fingerprintImage(buffer);
   const matches: FurtrackVisualMatch[] = [];
-  const errors: CandidateError[] = [];
+  const errors: CandidateError[] = [...candidatesResult.errors];
 
   for (const postId of candidatePostIds) {
     try {
@@ -532,10 +574,10 @@ export async function testFurtrackMatchesForEvent(args: {
   ];
   const maxCandidates = Math.min(
     Math.max(args.maxCandidates ?? DEFAULT_MAX_CANDIDATES, 1),
-    200,
+    2000,
   );
-  const maxPhotos = Math.min(Math.max(args.maxPhotos ?? 80, 1), 200);
-  const minScore = args.minScore ?? 0.82;
+  const maxPhotos = Math.min(Math.max(args.maxPhotos ?? 80, 1), 500);
+  const minScore = args.minScore ?? 0.74;
 
   const event = await prisma.event.findUnique({
     where: {
@@ -593,13 +635,14 @@ export async function testFurtrackMatchesForEvent(args: {
     throw new Error("No Furtrack candidate tags could be derived for this event.");
   }
 
-  const candidatePostIds = await resolveCandidatePostIds({
+  const candidatesResult = await resolveCandidatePostIds({
     tags: candidateTags,
     postIds: explicitPostIds,
-    pagesPerTag: Math.min(Math.max(args.pagesPerTag ?? 1, 1), 5),
+    pagesPerTag: Math.min(Math.max(args.pagesPerTag ?? 1, 1), 10),
     maxCandidates,
   });
-  const errors: CandidateError[] = [];
+  const candidatePostIds = candidatesResult.postIds;
+  const errors: CandidateError[] = [...candidatesResult.errors];
   const candidates: Array<{
     post: FurtrackPostDetail;
     fingerprint: ImageFingerprint;

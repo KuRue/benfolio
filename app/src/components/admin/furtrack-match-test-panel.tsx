@@ -96,7 +96,7 @@ function confidenceClass(confidence: VisualMatch["confidence"]) {
 }
 
 function isExactMatch(match: VisualMatch) {
-  return match.score >= 0.999 && match.hammingDistance === 0;
+  return match.hammingDistance === 0;
 }
 
 export function FurtrackMatchTestPanel({
@@ -115,9 +115,9 @@ export function FurtrackMatchTestPanel({
       : "",
   );
   const [postIds, setPostIds] = useState("");
-  const [maxCandidates, setMaxCandidates] = useState(120);
-  const [maxPhotos, setMaxPhotos] = useState(120);
-  const [pagesPerTag, setPagesPerTag] = useState(2);
+  const [maxCandidates, setMaxCandidates] = useState(800);
+  const [maxPhotos, setMaxPhotos] = useState(250);
+  const [pagesPerTag, setPagesPerTag] = useState(5);
   const [baseUrl, setBaseUrl] = useState(furtrackSettings.baseUrl);
   const [impersonate, setImpersonate] = useState(furtrackSettings.impersonate);
   const [photographerHandle, setPhotographerHandle] = useState(
@@ -509,7 +509,7 @@ export function FurtrackMatchTestPanel({
                 <input
                   type="number"
                   min={1}
-                  max={200}
+                  max={2000}
                   value={maxCandidates}
                   onChange={(event) => setMaxCandidates(Number(event.target.value))}
                   className="admin-input"
@@ -520,7 +520,7 @@ export function FurtrackMatchTestPanel({
                 <input
                   type="number"
                   min={1}
-                  max={200}
+                  max={500}
                   value={maxPhotos}
                   onChange={(event) => setMaxPhotos(Number(event.target.value))}
                   className="admin-input"
@@ -531,7 +531,7 @@ export function FurtrackMatchTestPanel({
                 <input
                   type="number"
                   min={1}
-                  max={5}
+                  max={10}
                   value={pagesPerTag}
                   onChange={(event) => setPagesPerTag(Number(event.target.value))}
                   className="admin-input"
