@@ -10,6 +10,7 @@ import sharp from "sharp";
 
 import { Prisma } from "../../prisma/generated/client/client.ts";
 import { env } from "./env.js";
+import { processFurtrackCacheJob } from "./furtrack-cache.js";
 import {
   handleImportedPhotoFailed,
   handleImportedPhotoReady,
@@ -465,6 +466,27 @@ const worker = new Worker<PhotoProcessingJob>(
 const importWorker = new Worker<ImportProcessingJob>(
   IMPORT_PROCESSING_QUEUE,
   async (job) => {
+    const importJob = await prisma.importJob.findUnique({
+      where: {
+        id: job.data.importJobId,
+      },
+      select: {
+        type: true,
+        payloadJson: true,
+      },
+    });
+
+    if (
+      importJob?.type === "FURTRACK_SYNC" &&
+      importJob.payloadJson &&
+      typeof importJob.payloadJson === "object" &&
+      !Array.isArray(importJob.payloadJson) &&
+      importJob.payloadJson.kind === "furtrack-cache-sync"
+    ) {
+      await processFurtrackCacheJob(job.data.importJobId);
+      return;
+    }
+
     await processImportJob(job.data.importJobId, async (photoId) => {
       await photoQueue.add("photo.process", { photoId }, { jobId: photoId });
     });

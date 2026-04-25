@@ -69,6 +69,13 @@ enum ImportCleanupStatus {
   FAILED
 }
 
+enum FurtrackCacheStatus {
+  PENDING
+  READY
+  FAILED
+  MISSING
+}
+
 enum PhotoOrderMode {
   AUTO
   MANUAL
@@ -274,6 +281,45 @@ model TagAlias {
   @@unique([category, slug])
   @@index([tagId])
   @@index([category, name])
+}
+
+model FurtrackCachedPost {
+  postId             String              @id
+  submitUserId       String?
+  metaFingerprint    String?
+  metaFiletype       String?
+  metaWidth          Int?
+  metaHeight         Int?
+  externalUrl        String?
+  imageUrl           String?
+  dHash              String?             @db.VarChar(16)
+  averageHash        String?             @db.VarChar(16)
+  syncStatus         FurtrackCacheStatus @default(PENDING)
+  errorMessage       String?
+  lastFetchedAt      DateTime?
+  lastFingerprintedAt DateTime?
+  missingAt          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  tags               FurtrackCachedTag[]
+
+  @@index([syncStatus, updatedAt])
+  @@index([dHash])
+  @@index([lastFetchedAt])
+}
+
+model FurtrackCachedTag {
+  postId    String
+  category  TagCategory
+  slug      String
+  name      String
+  rawValue  String
+  createdAt DateTime @default(now())
+  post      FurtrackCachedPost @relation(fields: [postId], references: [postId], onDelete: Cascade)
+
+  @@id([postId, category, slug, rawValue])
+  @@index([category, slug])
+  @@index([rawValue])
 }
 
 model PhotoTag {

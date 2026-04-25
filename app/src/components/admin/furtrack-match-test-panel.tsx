@@ -19,6 +19,30 @@ type FurtrackSettings = {
   hasEnvToken: boolean;
 };
 
+type FurtrackCacheSummary = {
+  readyPostCount: number;
+  failedPostCount: number;
+  missingPostCount: number;
+  pendingPostCount: number;
+  tagCount: number;
+  lastFetchedAt: string | null;
+  recentJobs: Array<{
+    id: string;
+    status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+    totalItems: number;
+    processedItems: number;
+    errorMessage: string | null;
+    createdAt: string;
+    updatedAt: string;
+    finishedAt: string | null;
+    payload: {
+      tag: string | null;
+      pages: number | null;
+      maxPosts: number | null;
+    } | null;
+  }>;
+};
+
 type VisualMatch = {
   postId: string;
   externalUrl: string;
@@ -84,6 +108,7 @@ type FurtrackMatchRun = {
 type FurtrackMatchPanelProps = {
   events: AdminEventOption[];
   furtrackSettings: FurtrackSettings;
+  furtrackCache: FurtrackCacheSummary;
 };
 
 function parseList(value: string) {
@@ -163,6 +188,7 @@ async function readJsonResponse<T extends { error?: string }>(
 export function FurtrackMatchTestPanel({
   events,
   furtrackSettings,
+  furtrackCache,
 }: FurtrackMatchPanelProps) {
   const [eventId, setEventId] = useState(events[0]?.id ?? "");
   // Pre-fill the candidate-tags textarea with the photographer feed when a
@@ -189,6 +215,7 @@ export function FurtrackMatchTestPanel({
   const [pending, setPending] = useState(false);
   const [syncPending, setSyncPending] = useState(false);
   const [settingsPending, setSettingsPending] = useState(false);
+  const [cacheSyncPending, setCacheSyncPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<EventMatchResult | null>(null);
@@ -259,6 +286,63 @@ export function FurtrackMatchTestPanel({
       );
     } finally {
       setSettingsPending(false);
+    }
+  }
+
+  async function syncCache() {
+    const tag = parseList(candidateTags)[0] || (photographerHandle ? `3:${photographerHandle}` : "");
+
+    if (!tag) {
+      setError("Set a photographer handle or candidate tag first.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Queue a Furtrack cache sync for ${tag}? This runs in the worker and may take a while.`,
+      )
+    ) {
+      return;
+    }
+
+    setCacheSyncPending(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/admin/furtrack/cache-sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tag,
+          pages: pagesPerTag,
+          maxPosts: maxCandidates,
+          refreshExisting: true,
+        }),
+      });
+      const payload = await readJsonResponse<{
+        error?: string;
+        message?: string;
+        job?: {
+          id: string;
+        };
+      }>(response, "Unable to queue Furtrack cache sync.");
+
+      setNotice(
+        payload.job
+          ? `Cache sync queued: ${payload.job.id}. Refresh this page to see progress.`
+          : payload.message ?? "Cache sync queued.",
+      );
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to queue Furtrack cache sync.",
+      );
+    } finally {
+      setCacheSyncPending(false);
     }
   }
 
@@ -539,6 +623,44 @@ export function FurtrackMatchTestPanel({
               {syncPending ? "Syncing..." : "Sync exact matches"}
             </button>
           </div>
+        </div>
+
+        <div className="grid gap-3 rounded-[1.35rem] border border-white/8 bg-black/20 p-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+          <div className="flex flex-wrap gap-2 text-sm text-white/58">
+            <span className="glass-chip px-4 py-2">
+              {furtrackCache.readyPostCount} cached posts
+            </span>
+            <span className="glass-chip px-4 py-2">
+              {furtrackCache.tagCount} cached tags
+            </span>
+            <span className="glass-chip px-4 py-2">
+              {furtrackCache.failedPostCount} failed
+            </span>
+            <span className="glass-chip px-4 py-2">
+              {furtrackCache.lastFetchedAt
+                ? `updated ${new Date(furtrackCache.lastFetchedAt).toLocaleString()}`
+                : "cache empty"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => void syncCache()}
+            disabled={cacheSyncPending || settingsPending}
+            className="admin-button-muted"
+          >
+            {cacheSyncPending ? "Queueing..." : "Sync Furtrack cache"}
+          </button>
+          {furtrackCache.recentJobs.length ? (
+            <div className="space-y-1 text-xs text-white/42 xl:col-span-2">
+              {furtrackCache.recentJobs.slice(0, 2).map((job) => (
+                <p key={job.id}>
+                  {job.payload?.tag ?? "Furtrack"} · {job.status.toLowerCase()} ·{" "}
+                  {job.processedItems}/{job.totalItems || "?"}
+                  {job.errorMessage ? ` · ${job.errorMessage.split("\n")[0]}` : ""}
+                </p>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <details open className="muted-panel px-4 py-4">

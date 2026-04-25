@@ -304,9 +304,9 @@ The parser understands Furtrack numeric prefixes:
 
 Furtrack requests default to `FURTRACK_FETCH_MODE=auto`, which tries the bundled
 `curl_cffi` helper first and falls back to Node fetch if the helper is unavailable.
-The published web Docker image includes Python and `curl_cffi`, so server deployments can
-use browser TLS impersonation without adding another service. For local non-Docker
-development, install the helper dependency with:
+The published web and worker Docker images include Python and `curl_cffi`, so server
+deployments can use browser TLS impersonation without adding another service. For local
+non-Docker development, install the helper dependency with:
 
 ```bash
 python -m pip install -r scripts/furtrack-requirements.txt
@@ -329,14 +329,21 @@ slug, kicker, and year. You can still override discovery with:
 The matcher:
 
 - loads local processed derivatives from private storage
-- fetches Furtrack candidate post metadata and images
+- uses cached Furtrack post metadata/fingerprints first when available
+- falls back to live Furtrack candidate metadata/images when the cache is empty
 - computes a simple perceptual difference hash for each image
 - ranks candidates by visual similarity and aspect-ratio fit
 - shows local and Furtrack photos side-by-side for review
 - can sync one confirmed match or all exact `100%` visual-hash matches
 
-The **Sync 100% matches** action reruns the event match, filters to exact hash matches
-only, then imports Furtrack tags and creates Furtrack external links for those photos.
+The **Sync Furtrack cache** action queues a worker job that pulls post IDs for the selected
+candidate tag, fetches each post's tags and image fingerprint, and stores them locally.
+Run it for your photographer tag such as `3:your_handle`; later album matching can use the
+local cache instead of re-fetching the same Furtrack posts for every event. Re-run it as
+maintenance when old Furtrack posts receive new tags.
+
+The **Sync exact matches** action uses the exact matches currently shown, then imports
+Furtrack tags and creates Furtrack external links for those photos.
 It intentionally skips non-exact matches so the first writable version stays conservative.
 Near matches must be confirmed individually before they write tags.
 

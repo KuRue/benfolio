@@ -10,6 +10,7 @@ import {
   loadFurtrackPostIdsByTagPage,
   type FurtrackPostDetail,
 } from "@/lib/furtrack";
+import { loadCachedFurtrackCandidates } from "@/lib/furtrack-cache";
 import { prisma } from "@/lib/prisma";
 import { buildDisplayUrl, getStorageBuckets, readObject } from "@/lib/storage";
 import { getTagCategoryLabel } from "@/lib/tags";
@@ -1100,13 +1101,21 @@ export async function createFurtrackMatchRun(args: {
     throw new Error("No Furtrack candidate tags could be derived for this event.");
   }
 
-  const initialCandidateTotal = candidateTags.length
-    ? maxCandidates
-    : explicitPostIds.length;
+  const cachedCandidates = await loadCachedFurtrackCandidates({
+    tags: candidateTags,
+    postIds: explicitPostIds,
+    maxCandidates,
+  });
+  const useCachedCandidates = cachedCandidates.length > 0;
+  const initialCandidateTotal = useCachedCandidates
+    ? cachedCandidates.length
+    : candidateTags.length
+      ? maxCandidates
+      : explicitPostIds.length;
   const payload: FurtrackMatchRunPayload = {
     kind: "furtrack-match-run",
     version: 1,
-    stage: candidateTags.length ? "discover" : "local",
+    stage: useCachedCandidates || !candidateTags.length ? "local" : "discover",
     event: {
       id: event.id,
       title: event.title,
@@ -1134,11 +1143,11 @@ export async function createFurtrackMatchRun(args: {
       tagIndex: 0,
       page: 0,
       candidateIndex: 0,
-      postIds: explicitPostIds,
+      postIds: useCachedCandidates ? [] : explicitPostIds,
     },
     localRefs: event.photos,
     locals: [],
-    candidates: [],
+    candidates: cachedCandidates,
     errors: [],
   };
   const job = await prisma.importJob.create({

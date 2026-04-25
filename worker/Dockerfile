@@ -21,8 +21,15 @@ FROM node:24-bookworm-slim AS runner
 ENV NODE_ENV=production
 WORKDIR /workspace
 
+COPY scripts/furtrack-requirements.txt /tmp/furtrack-requirements.txt
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates python3 python3-pip \
+  && pip3 install --break-system-packages --no-cache-dir -r /tmp/furtrack-requirements.txt \
+  && rm -rf /var/lib/apt/lists/* /tmp/furtrack-requirements.txt
+
 COPY --from=production-deps --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/worker/dist ./worker/dist
+COPY --chown=node:node scripts/furtrack_fetch.py ./scripts/furtrack_fetch.py
 
 USER node
 
