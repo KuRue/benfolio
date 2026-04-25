@@ -99,6 +99,36 @@ function isExactMatch(match: VisualMatch) {
   return match.hammingDistance === 0;
 }
 
+async function readJsonResponse<T extends { error?: string }>(
+  response: Response,
+  fallbackError: string,
+) {
+  const text = await response.text();
+  let payload: T;
+
+  try {
+    payload = JSON.parse(text) as T;
+  } catch {
+    const normalized = text.replace(/\s+/g, " ").trim();
+    const snippet = normalized.length > 220
+      ? `${normalized.slice(0, 220)}...`
+      : normalized;
+    const status = `${response.status} ${response.statusText}`.trim();
+
+    throw new Error(
+      snippet
+        ? `${fallbackError} (${status}): ${snippet}`
+        : `${fallbackError} (${status}).`,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? `${fallbackError} (${response.status}).`);
+  }
+
+  return payload;
+}
+
 export function FurtrackMatchTestPanel({
   events,
   furtrackSettings,
@@ -168,7 +198,7 @@ export function FurtrackMatchTestPanel({
           clearToken: options?.clearToken ?? false,
         }),
       });
-      const payload = (await response.json()) as {
+      const payload = await readJsonResponse<{
         error?: string;
         message?: string;
         settings?: {
@@ -177,9 +207,9 @@ export function FurtrackMatchTestPanel({
           photographerHandle: string | null;
           hasSavedToken: boolean;
         };
-      };
+      }>(response, "Unable to save Furtrack settings.");
 
-      if (!response.ok || !payload.settings) {
+      if (!payload.settings) {
         throw new Error(payload.error ?? "Unable to save Furtrack settings.");
       }
 
@@ -227,12 +257,12 @@ export function FurtrackMatchTestPanel({
           pagesPerTag,
         }),
       });
-      const payload = (await response.json()) as {
+      const payload = await readJsonResponse<{
         error?: string;
         result?: EventMatchResult;
-      };
+      }>(response, "Unable to find Furtrack matches.");
 
-      if (!response.ok || !payload.result) {
+      if (!payload.result) {
         throw new Error(payload.error ?? "Unable to find Furtrack matches.");
       }
 
@@ -284,14 +314,10 @@ export function FurtrackMatchTestPanel({
           pagesPerTag,
         }),
       });
-      const payload = (await response.json()) as {
+      const payload = await readJsonResponse<{
         error?: string;
         message?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Unable to sync exact matches.");
-      }
+      }>(response, "Unable to sync exact matches.");
 
       setNotice(payload.message ?? "Exact matches synced.");
       await findMatches();
@@ -327,14 +353,10 @@ export function FurtrackMatchTestPanel({
         },
         body: JSON.stringify(args),
       });
-      const payload = (await response.json()) as {
+      const payload = await readJsonResponse<{
         error?: string;
         message?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Unable to sync match.");
-      }
+      }>(response, "Unable to sync match.");
 
       setNotice(payload.message ?? "Match synced.");
       setDismissedKeys((current) => [...current, `${args.photoId}:${args.postId}`]);
