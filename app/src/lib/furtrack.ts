@@ -486,6 +486,12 @@ function furtrackApiHeaders(settings: FurtrackRuntimeSettings) {
   // curl_cffi with `impersonate=chrome*`, curl_cffi sets a UA + sec-ch-ua
   // bundle that matches its TLS fingerprint. Forcing our own UA creates
   // a UA/TLS mismatch that Furtrack's bot layer rejects with HTTP 400.
+  //
+  // Sec-Fetch-* are set explicitly to the XHR/CORS shape — curl_cffi's
+  // impersonation defaults look like a top-level page navigation, which
+  // is inconsistent with sending an Origin header and gets flagged by
+  // Cloudflare. www.furtrack.com → solar.furtrack.com is same-site
+  // (shared registrable domain), so Sec-Fetch-Site is "same-site".
   const bearer = settings.authToken
     ? settings.authToken.replace(/^bearer\s+/i, "").trim()
     : null;
@@ -495,6 +501,9 @@ function furtrackApiHeaders(settings: FurtrackRuntimeSettings) {
     "Accept-Language": "en-US,en;q=0.9",
     Origin: FURTRACK_PUBLIC_BASE_URL,
     Referer: `${FURTRACK_PUBLIC_BASE_URL}/`,
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-site",
     ...(bearer
       ? {
           Authorization: `Bearer ${bearer}`,
